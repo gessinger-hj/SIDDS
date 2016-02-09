@@ -1,2 +1,2 @@
-# SIDDS
+# sidds
 Simple IDentity Definition Store
