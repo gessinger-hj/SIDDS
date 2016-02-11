@@ -4,6 +4,14 @@ INSERT INTO T_IDENTITY_TYPE ( IDENTITY_TYPE_KEY, IDENTITY_TYPE_NAME ) VALUES ( 1
 
 INSERT INTO T_IDENTITY_TYPE ( IDENTITY_TYPE_KEY, IDENTITY_TYPE_NAME ) VALUES ( 2, 'Person' ) ;
 
+-- Rights ---------------------------------------------------------
+
+INSERT INTO T_RIGHT ( RIGHT_NAME ) VALUES ( 'CAN_EDIT_USER_OF' ) ; 
+
+INSERT INTO T_RIGHT ( RIGHT_NAME ) VALUES ( 'CAN_EDIT_USER' ) ; 
+
+INSERT INTO T_RIGHT ( RIGHT_NAME ) VALUES ( 'CAN_EDIT_GROUP' ) ; 
+
 -- Root -----------------------------------------------------------
 INSERT INTO T_IDENTITY ( IDENTITY_NAME, IDENTITY_TYPE_KEY, DESCRIPTION, ENABLED, LOGIN_ENABLED )
 VALUES ( 'RootGroup', ( select IDENTITY_TYPE_KEY from T_IDENTITY_TYPE where IDENTITY_TYPE_NAME='Group' ), 'Root group', '1', '0' ) ;
@@ -25,9 +33,29 @@ VALUES ( 'admin', ( select IDENTITY_TYPE_KEY from T_IDENTITY_TYPE where IDENTITY
 INSERT INTO T_IDENTITY_TO_IDENTITY ( PARENT_IDENTITY_KEY, IDENTITY_KEY )
 VALUES ( ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='AdminGroup' ), ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='admin' ) ) ;
 
+INSERT INTO T_IDENTITY_TO_RIGHT ( IDENTITY_KEY, RIGHT_KEY )
+VALUES ( (select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='AdminGroup')
+       , (select RIGHT_KEY from T_RIGHT where RIGHT_NAME='CAN_EDIT_USER')
+       );
+
 -- Customer Group ----------------------------------------------------
 INSERT INTO T_IDENTITY ( IDENTITY_NAME, IDENTITY_TYPE_KEY, DESCRIPTION, ENABLED, LOGIN_ENABLED )
 VALUES ( 'CustomerGroup', ( select IDENTITY_TYPE_KEY from T_IDENTITY_TYPE where IDENTITY_TYPE_NAME='Group' ), 'Customer group', '1', '0' ) ;
+
+-- Key Account Customer Customer Group -------------------------------
+INSERT INTO T_IDENTITY ( IDENTITY_NAME, IDENTITY_TYPE_KEY, DESCRIPTION, ENABLED, LOGIN_ENABLED )
+VALUES ( 'KeyAccountCustomerGroup', ( select IDENTITY_TYPE_KEY from T_IDENTITY_TYPE where IDENTITY_TYPE_NAME='Group' ), 'Key Account Customer group', '1', '0' ) ;
+
+INSERT INTO T_RIGHT ( RIGHT_NAME ) VALUES ( 'CAN_PURCHASE_GOLD_CARD' ) ; 
+
+INSERT INTO T_IDENTITY_TO_RIGHT ( IDENTITY_KEY, RIGHT_KEY )
+VALUES ( (select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='KeyAccountCustomerGroup')
+       , (select RIGHT_KEY from T_RIGHT where RIGHT_NAME='CAN_PURCHASE_GOLD_CARD')
+       );
+
+INSERT INTO T_IDENTITY_TO_IDENTITY ( PARENT_IDENTITY_KEY, IDENTITY_KEY )
+VALUES ( ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='CustomerGroup' ),
+ ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='KeyAccountCustomerGroup' ) ) ;
 
 -- Customer ----------------------------------------------------------
 
@@ -47,13 +75,8 @@ VALUES ( ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='AdminGroup' 
 INSERT INTO T_IDENTITY_TO_IDENTITY ( PARENT_IDENTITY_KEY, IDENTITY_KEY )
 VALUES ( ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='CustomerGroup' ), ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='miller' ) ) ;
 
--- Rights ---------------------------------------------------------
-
-INSERT INTO T_RIGHT ( RIGHT_NAME ) VALUES ( 'CAN_EDIT_USER_OF' ) ; 
-
-INSERT INTO T_RIGHT ( RIGHT_NAME ) VALUES ( 'CAN_EDIT_USER' ) ; 
-
-INSERT INTO T_RIGHT ( RIGHT_NAME ) VALUES ( 'CAN_EDIT_GROUP' ) ; 
+INSERT INTO T_IDENTITY_TO_IDENTITY ( PARENT_IDENTITY_KEY, IDENTITY_KEY )
+VALUES ( ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='KeyAccountCustomerGroup' ), ( select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='miller' ) ) ;
 
 -- Group To Rights -------------------------------------------------
 
