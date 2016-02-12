@@ -32,9 +32,8 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "node-sqlite-purejs": "0.0.2",
-    "sql.js": "^0.2.21",
-    "sqlite3": "^3.1.1"
+    "node-mysql": "^0.4.2",
+    "sql.js": "^0.2.21"
   },
   "bin": {}
 }
