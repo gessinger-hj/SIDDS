@@ -1,5 +1,5 @@
 {
-  "name": "gepard",
+  "name": "sidds",
   "description": "Simple IDentity Definition Store",
   "version": "0.1.0",
   "homepage": "https://github.com/gessinger-hj",
@@ -32,8 +32,10 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "asyncawait": "^1.0.3",
     "node-mysql": "^0.4.2",
-    "sql.js": "^0.2.21"
+    "sql.js": "^0.2.21",
+    "wait.for": "^0.6.6"
   },
   "bin": {}
 }
