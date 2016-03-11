@@ -6,30 +6,40 @@ var T = require ( "gepard" ) ;
   var connection =  mysql.createConnection ( dburl ) ;
   connection.connect();
   connection.query( "use sidds" );
-var sql = "select IDENTITY_NAME, IDENTITY_KEY from t_identity where IDENTITY_NAME=?";	
+var sql = "select IDENTITY_NAME, IDENTITY_KEY from t_identity where IDENTITY_NAME=?"; 
 
-function loadDataFromDatabase()
-{
-connection.query( sql, [ 'miller' ], function(err, rows, fields ){
-    // console.log ( fields ) ;
-  	if(err)	{
-  		throw err;
-  	}
-    else
-    {
-console.log ( rows[0] ) ;
-  		for ( var i = 0 ; i < rows.length ; i++ )
-  		{
-      // console.log( rows[i].IDENTITY_NAME );
-  		// T.log( rows[i] );
-  		}
-  	}
-  	connection.end() ;
-  });
-}
-loadDataFromDatabase() ;
-return ;
 var wait = require ( "wait.for" ) ;
+
+UserDB = function()
+{
+
+};
+UserDB.prototype.toString = function()
+{
+  return "(UserDB)" ;
+};
+UserDB.prototype.selectIdentity = function ( identity_name )
+{
+//   connection.query( sql, [ identity_name ], function(err, rows, fields )
+//   {
+//    if(err) {
+//      throw err;
+//    }
+//     else
+//     {
+// console.log ( rows[0] ) ;
+//      for ( var i = 0 ; i < rows.length ; i++ )
+//      {
+//       // console.log( rows[i].IDENTITY_NAME );
+//      // T.log( rows[i] );
+//      }
+//    }
+//    connection.end() ;
+//   });
+}
+var udb = new UserDB() ;
+wait.launchFiber2 ( udb, udb.selectIdentity, 'miller' ) ;
+return ;
 
 console.log ( connection ) ;
 connection.q = function(_sql, params, stdCallback){ 
@@ -37,9 +47,9 @@ connection.q = function(_sql, params, stdCallback){
                                  return stdCallback(err,{rows:rows,columns:columns}); 
                          });
  }
-function process()
+function process(p)
 {
-
+console.log ( "p=" + p ) ;
   try {
     var result = wait.forMethod(connection, "q", sql, [ 'miller' ] ); 
     console.log(result.rows);
@@ -56,4 +66,4 @@ function process()
   // console.log ( "data[0].IDENTITY_KEY=" + data[0].IDENTITY_KEY ) ;
   // connection.end() ;
 }
-wait.launchFiber(process);
+wait.launchFiber(process,"xx");
