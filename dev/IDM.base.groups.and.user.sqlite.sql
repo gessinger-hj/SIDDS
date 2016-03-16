@@ -1,3 +1,5 @@
+
+
 -- Identity Types--------------------------------------------------
 
 INSERT INTO T_IDENTITY_TYPE ( IDENTITY_TYPE_KEY, IDENTITY_TYPE_NAME ) VALUES ( 1, 'Group' ) ;
