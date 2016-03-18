@@ -30,7 +30,9 @@
   "engines": {
     "node": ">= 0.10"
   },
-  "dependencies": {},
+  "dependencies": {
+    "pg": "^4.5.1"
+  },
   "devDependencies": {
     "asyncawait": "^1.0.3",
     "node-mysql": "^0.4.2",

@@ -1,5 +1,3 @@
-use sidds ;
-
 -- Identity Types--------------------------------------------------
 
 INSERT INTO T_IDENTITY_TYPE ( IDENTITY_TYPE_KEY, IDENTITY_TYPE_NAME ) VALUES ( 1, 'Group' ) ;
@@ -99,3 +97,4 @@ VALUES ( (select IDENTITY_KEY from T_IDENTITY where IDENTITY_NAME='RootGroup')
        );
 
 ----------------------------------------------------------------------
+commit ;
