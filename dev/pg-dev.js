@@ -2,7 +2,7 @@
 * @Author: hg02055
 * @Date:   2016-03-18 14:21:24
 * @Last Modified by:   hg02055
-* @Last Modified time: 2016-03-18 19:11:26
+* @Last Modified time: 2016-03-21 15:08:56
 */
 
 'use strict';
@@ -62,15 +62,14 @@ var execute = function()
 	if ( response.err )
 	{
 		console.log ( err ) ;
+		delete connection["q"] ;
 		pg.pools.destroy ( connection ) ;
 		return ;
 	}
- console.log(response.result.rows);//.rows[0]);
-var pool = pg.pools.getOrCreate() ;
-pool.release ( connection ) ;
-pool.destroyAllNow() ;
-// console.log ( "" + pool ) ;
-	// pg.pools.release ( connection ) ;
+	console.log(response.result.rows);//.rows[0]);
+	var pool = pg.pools.getOrCreate() ;
+	pool.release ( connection ) ;
+	pool.destroyAllNow() ;
 }
 
 wait.launchFiber ( execute ) ;
