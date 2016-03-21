@@ -1,0 +1,15 @@
+Postgres
+--------
+
+sidds-admin
+
+CREATE ROLE sidds LOGIN ENCRYPTED PASSWORD 'md5ff5d7e4c3ea7547e7727f84e67fa0d56'
+  SUPERUSER CREATEDB CREATEROLE
+   VALID UNTIL 'infinity';
+   
+CREATE DATABASE sidds
+  WITH ENCODING='UTF8'
+       CONNECTION LIMIT=-1;
+
+
+
