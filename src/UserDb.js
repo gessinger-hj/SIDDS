@@ -1,5 +1,6 @@
 var gepard = require ( "gepard" ) ;
 var wait = require ( "wait.for" ) ;
+var Database = require ( "./Database" ) ;
 
 var S1 = 'SELECT'
        + '  identity_key'      
@@ -47,188 +48,6 @@ var S_RIGHTS = 'SELECT '
              + '  WHERE identity_key=?'
              ;
 
-var Database = function ( url )
-{
-  this.url = url ;
-  if ( this.url.toUpperCase().indexOf ( "MYSQL" ) >= 0 )
-  {
-    this._MYSQL = true ;
-  }
-  else
-  if ( this.url.toUpperCase().indexOf ( "SQLITE" ) >= 0 )
-  {
-    this._SQLITE = true ;
-  }
-  else
-  if ( this.url.toUpperCase().indexOf ( "POSTGRES" ) >= 0 )
-  {
-    this._POSTGRES = true ;
-  }
-  else
-  {
-    throw new Error ( "Not a valid url: " + this.url ) ;
-  }
-};
-Database.prototype.toString = function()
-{
-  return "(Database)[url=" + this.url + "]" ;
-};
-Database.prototype.getConnection = function()
-{
-  if ( this.connection )
-  {
-    return this.connection ;
-  }
-  if ( this._MYSQL )
-  {
-    var mysql =  require('mysql');
-    this.connection =  mysql.createConnection ( this.url ) ;
-    this.connection.connect();
-    this.connection.q = function ( _sql, params, stdCallback )
-    { 
-      this.query ( _sql, params, function(err,rows,columns)
-      { 
-        return stdCallback(err,{rows:rows,columns:columns}); 
-      });
-    };
-  }
-  else
-  if ( this._SQLITE )
-  {
-    this._SYSDATE = "CURRENT_TIMESTAMP" ;
-    this._UNIQUE = "DISTINCT" ;
-    var sql = require('sql.js');
-    var file = this.url.substring ( this.url.indexOf ( ':' ) + 1 ) ;
-    var fs = require('fs');
-    var fileExists = false ;
-    try
-    {
-      fs.statSync ( file ) ;
-      fileExists = true ;
-      // var data = db.export(); TODO: write data
-      // var buffer = new Buffer(data);
-      // fs.writeFileSync("filename.sqlite", buffer);
-    }
-    catch ( exc )
-    {
-      console.log ( exc ) ;
-    }
-    if ( fileExists )
-    {
-      var filebuffer = fs.readFileSync ( file ) ;
-      this.connection = new sql.Database ( filebuffer ) ;
-    }
-    else
-    {
-      this.connection = new sql.Database() ;
-    }
-  }
-  else
-  if ( this._POSTGRES )
-  {
-    this.pg = require('pg');
-    this.pg.conn = function ( url, stdCallback )
-    { 
-      this.connect ( url, function ( err, client, done )
-      { 
-        return stdCallback ( err, { err:err, connection:client } ) ; 
-      });
-    };
-    var response = wait.forMethod ( this.pg, "conn", this.url ) ;
-    this.connection = response.connection ;
-    if ( response.err )
-    {
-      var pool = this.pg.pools.getOrCreate()
-      pool.destroy ( this.connection ) ;
-      throw new Error ( response.err ) ;
-      return ;
-    }
-    this.connection.q = function ( _sql, params, stdCallback )
-    {
-      if ( typeof params === 'function' )
-      {
-        stdCallback = params ;
-        this.query ( _sql, function ( err, result )
-        {
-          return stdCallback ( err, { err:err, result:result } ) ; 
-        });
-      }
-      else
-      {
-        this.query ( _sql, params, function ( err, result )
-        { 
-          return stdCallback ( err, { err:err, result:result } ) ; 
-        });
-      }
-    };
-  }
-  return this.connection ;
-};
-Database.prototype.close = function()
-{
-  if ( this._MYSQL ) { if ( this.connection ) this.connection.end() ; }
-  if ( this._SQLITE ) { if ( this.connection ) this.connection.close() ; }
-  if ( this._POSTGRES )
-  {
-    delete this.connection["q"] ;
-    var pool = this.pg.pools.getOrCreate() ;
-    pool.release ( this.connection ) ;
-  }
-  this.connection = null ;
-};
-Database.prototype.disconnect = function()
-{
-  if ( this._MYSQL ) { if ( this.connection ) this.connection.end() ; }
-  if ( this._SQLITE ) { if ( this.connection ) this.connection.close() ; }
-  if ( this._POSTGRES )
-  {
-    var pool = this.pg.pools.getOrCreate() ;
-    if ( this.connection )
-    {
-      delete this.connection["q"] ;
-      pool.release ( this.connection ) ;
-    }
-    pool.destroyAllNow() ;
-  }
-  this.connection = null ;
-};
-Database.prototype.select = function ( sql, hostVars )
-{
-  var result ;
-  if ( this._MYSQL )
-  {
-  // result.insertId, TODO for mySQL
-    result = wait.forMethod( this.connection, "q", sql, hostVars ); 
-    return result.rows ;
-  }
-  else
-  if ( this._SQLITE )
-  {
-    var stmt = this.connection.prepare ( sql, hostVars ) ;
-    result = [] ;
-    while ( stmt.step() )
-    {
-      result.push ( stmt.getAsObject() ) ;
-    }
-    return result
-  }
-  else
-  if ( this._POSTGRES )
-  {
-    var sql1 = sql.replace ( /\?/g, "$1" ) ;
-    var response = wait.forMethod ( this.connection, "q", sql1, hostVars ) ;
-    if ( response.err )
-    {
-      console.log ( err ) ;
-      delete connection["q"] ;
-      var pool = this.pg.getOrCreate() ;
-      pool.destroy ( connection ) ;
-      return ;
-    }
-    return response.result.rows ; //.rows[0]);
-  }
-};
-
 UserDB = function ( url )
 {
   this.db = new Database ( url ) ;
@@ -256,19 +75,7 @@ UserDB.prototype.verifyUser = function ( userIn, callback )
                         , foundIdentityKeys
                         , parentIdentityTypeList
                         ) ;
-// console.log ( "user.identity_key=" + user.identity_key ) ;
-// console.log ( "identityKeyList" ) ;
-// console.log ( identityKeyList ) ;
-// console.log ( "foundIdentityKeys" ) ;
-// console.log ( foundIdentityKeys ) ;
-// console.log ( "parentIdentityTypeList" ) ;
-// console.log ( parentIdentityTypeList ) ;
-// console.log ( "userIn" ) ;
-// console.log ( "userIn 1 ---------------------" ) ;
-// console.log ( userIn ) ;
     this.collectRights ( userIn, identityKeyList ) ;
-// console.log ( "userIn 2 ---------------------" ) ;
-// console.log ( userIn ) ;
     callback ( null, userIn ) ;
   }
   catch ( err )
@@ -316,8 +123,8 @@ UserDB.prototype.collectParents = function ( userIn
     localIdentityKeyList.length = 0 ;
   }
 };
-UserDB.prototype.collectRights = function (  userIn
-                                          ,  identityKeyList
+UserDB.prototype.collectRights = function ( userIn
+                                          , identityKeyList
                                           )
 {
   if ( ! userIn.context ) userIn.context = "*" ;
@@ -355,6 +162,7 @@ var verifyForLogin = true ;
 var userIn = {} ;
 userIn["name"] = "Miller" ;
 userIn["context"] = "WEB" ;
+userIn["pwd"] = "123456" ;
 
 // var url = gepard.getProperty ( "url", "mysql://root:@localhost/sidds" ) ;
 var url = gepard.getProperty ( "url", "sqlite:sidds.db" ) ;
