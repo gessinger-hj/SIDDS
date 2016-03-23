@@ -31,7 +31,8 @@
     "node": ">= 0.10"
   },
   "dependencies": {
-    "pg": "^4.5.1"
+    "pg": "^4.5.1",
+    "wait.for": "^0.6.6"
   },
   "devDependencies": {
     "asyncawait": "^1.0.3",
