@@ -61,22 +61,51 @@ UserDB.prototype.verifyUser = function ( userIn, callback )
   this.db.getConnection() ;
   try
   {
-    var userList = this.db.select ( S1, [ userIn.name.toUpperCase() ] ) ;
-    var user = userList[0] ;
-    var roleNameList = [] ;
-    var roleKeyList  = [] 
-    var identityKeyList  = [] ;
-    var foundIdentityKeys = {} ;
+    var userList               = this.db.select ( S1, [ userIn.id.toUpperCase() ] ) ;
+    var user                   = userList[0] ;
+    userIn.key                 = user.identity_key ;
+    userIn.id                  = user.identity_name ;
+    if ( userIn["_pwd"] )
+    {
+      if ( ! user.salt )
+      {
+        if ( user.pwd !== userIn._pwd )
+        {
+          try
+          {
+            callback.call ( this, "Invalid credentials" ) ;
+          }
+          catch ( exc )
+          {
+            console.log ( exc ) ;
+          }
+          return ;
+        }
+        var crypto = require ( "crypto" ) ;
+        var buf = crypto.randomBytes ( 4 ) ;
+        var salt = buf.readInt32LE() ;
+        var md5pwd = crypto.createHash('md5').update( user.pwd ).digest("hex") ;
+console.log ( "md5pwd=" + md5pwd ) ;
+      }
+    }
+    userIn._pwd = "" ;
+    var identityKeyList        = [] ;
+    var foundIdentityKeys      = {} ;
     var parentIdentityTypeList = [] ;
-    var dentityToRoleContext  = [] ;
+    var identityKeyToGroup     = {} ;
     this.collectParents ( userIn
                         , user.identity_key
                         , identityKeyList
                         , foundIdentityKeys
                         , parentIdentityTypeList
+                        , identityKeyToGroup
                         ) ;
-    this.collectRights ( userIn, identityKeyList ) ;
-    callback ( null, userIn ) ;
+    this.collectRights ( userIn, identityKeyList, identityKeyToGroup ) ;
+    if ( typeof callback === 'function' )
+    {
+      callback ( null, userIn ) ;
+    }
+    return userIn ;
   }
   catch ( err )
   {
@@ -89,6 +118,7 @@ UserDB.prototype.collectParents = function ( userIn
                                            , identityKeyList
                                            , foundIdentityKeys
                                            , parentIdentityTypeList
+                                           , identityKeyToGroup
                                            )
 {
   var localIdentityKeyList = [] ;
@@ -103,15 +133,20 @@ UserDB.prototype.collectParents = function ( userIn
       parentIdentityTypeList.push ( [ row.identity_type_name, row.parent_identity_name ] ) ;
       if ( row.parent_identity_name )
       {
-        if ( ! userIn.groups ) userIn.groups = {} ;
-        userIn.groups[row.parent_identity_name] = row.parent_identity_key ;
+        if ( ! userIn.groups ) userIn.groups = { keys:{}, rights:{} } ;
+        userIn.groups.keys[row.parent_identity_name]     = row.parent_identity_key ;
+        identityKeyToGroup["" + row.parent_identity_key] = row.parent_identity_name ;
       }
       identityKeyList.push ( row.parent_identity_key ) ;
       localIdentityKeyList.push ( row.parent_identity_key ) ;
     }
     for ( var i = 0 ; i < localIdentityKeyList.length ; i++ )
     {
-      this.collectParents ( userIn, localIdentityKeyList[i], identityKeyList, foundIdentityKeys, parentIdentityTypeList ) ;
+      this.collectParents ( userIn
+                          , localIdentityKeyList[i]
+                          , identityKeyList, foundIdentityKeys
+                          , parentIdentityTypeList
+                          ) ;
     }
   }
   catch ( exc )
@@ -125,6 +160,7 @@ UserDB.prototype.collectParents = function ( userIn
 };
 UserDB.prototype.collectRights = function ( userIn
                                           , identityKeyList
+                                          , identityKeyToGroup
                                           )
 {
   if ( ! userIn.context ) userIn.context = "*" ;
@@ -147,7 +183,18 @@ UserDB.prototype.collectRights = function ( userIn
           continue ;
         }
         if ( ! userIn.rights ) userIn.rights = {} ;
-        userIn.rights[row.right_name] = row.right_value ;
+        if ( ! userIn.rights[row.right_name] )
+        {
+          userIn.rights[row.right_name] = row.right_value ;
+        }
+        var groupName   = identityKeyToGroup[""+identityKeyList[j]] ;
+        var groupRights = userIn.groups.rights[groupName] ;
+        if ( ! groupRights )
+        {
+          groupRights                     = {} ;
+          userIn.groups.rights[groupName] = groupRights ;
+        }
+        groupRights[row.right_name] = row.right_value ;
       }
     }
   }
@@ -157,31 +204,36 @@ UserDB.prototype.collectRights = function ( userIn
   }
 };
 
-var verifyForLogin = true ;
+module.exports = Database ;
 
-var userIn = {} ;
-userIn["name"] = "Miller" ;
-userIn["context"] = "WEB" ;
-userIn["pwd"] = "123456" ;
-
-// var url = gepard.getProperty ( "url", "mysql://root:@localhost/sidds" ) ;
-var url = gepard.getProperty ( "url", "sqlite:sidds.db" ) ;
-var udb = new UserDB ( url ) ;
-console.log ( "udb=" + udb.db ) ;
-wait.launchFiber ( udb.verifyUser.bind ( udb ), userIn, function ( err, user )
+if ( require.main === module )
 {
-  if ( err )
+  var verifyForLogin = true ;
+
+  var userIn = {} ;
+  userIn["id"] = "Miller" ;
+  userIn["context"] = "WEB" ;
+  userIn["_pwd"] = "654321" ;
+
+  // var url = gepard.getProperty ( "dburl", "mysql://root:@localhost/sidds" ) ;
+  var url = gepard.getProperty ( "dburl", "sqlite://../test/sidds.db" ) ;
+  var udb = new UserDB ( url ) ;
+  console.log ( "udb=" + udb.db ) ;
+  wait.launchFiber ( udb.verifyUser.bind ( udb ), userIn, function ( err, user )
   {
-    console.log ( err ) ;
-    return ;
-  }
-  console.log ( user ) ;
-  // if ( verifyForLogin )
-  // {
-  //   if ( ! user.LOGIN_ENABLED )
-  //   {
-  //     throw new Error ( "Invalid user." ) ;
-  //   }
-  // }
-  udb.db.disconnect() ;
-} ) ;
+    if ( err )
+    {
+      gepard.log ( err ) ;
+      return ;
+    }
+    gepard.log ( user ) ;
+    // if ( verifyForLogin )
+    // {
+    //   if ( ! user.LOGIN_ENABLED )
+    //   {
+    //     throw new Error ( "Invalid user." ) ;
+    //   }
+    // }
+    udb.db.disconnect() ;
+  } ) ;
+}

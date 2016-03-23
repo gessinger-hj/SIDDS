@@ -15,50 +15,44 @@ var dburl = gepard.getProperty ( "dburl", "mysql://root:@localhost/sidds" ) ;
 var db = new Database ( dburl ) ;
 client.on ( "DB:REQUEST", function(e)
 {
-  Log.log ( e.toString() ) ;
-	// var connection =  mysql.createConnection ( dburl ) ;
-  // connection.connect();
-	wait.launchFiber ( function()
+	db.getConnection ( function ( err, connection )
 	{
-		db.getConnection() ;
-	// connection.query( "use cdcol" );
-	// var str = "select * from cds where titel='Glee'";	
 		var str = "select * from t_identity";	
 		var tree = new XmlTree() ;
 		var tab = tree.add ( "cds" ) ;
-		db.connection.query ( str, function ( err, rows )
+
+		this.select ( str, function ( err, rows )
 		{
 			if ( err )
 			{
 				Log.error ( "" + err + " in \n" + str ) ;
 	      e.control.status = { code:1, name:"error", reason:"" + err } ;
-				connection.end() ;
+				this.close() ;
 		 	}
 		 	else
 		 	{
-		    var n = rows.length ;
-				for ( var i = 0 ; i < n ; i++ )
-				{
-		      var xr = tab.add ( "row" ) ;
-	  	    var r = rows[i] ;
-		      for ( k in r )
-		      {
-		        var v = r[k] ;
-		        if ( v === null ) continue ;
-		        xr.add ( k, v ) ;
-		      }
-		    }
-				db.close() ;
+		  //   var n = rows.length ;
+				// for ( var i = 0 ; i < n ; i++ )
+				// {
+		  //     var xr = tab.add ( "row" ) ;
+	  	//     var r = rows[i] ;
+		  //     for ( k in r )
+		  //     {
+		  //       var v = r[k] ;
+		  //       if ( v === null ) continue ;
+		  //       xr.add ( k, v ) ;
+		  //     }
+		  //   }
+				this.close() ;
 			}
-			// console.log ( e ) ;
-			e.body.RESULT = tree.toString() ;
-			// console.log ( tree.toString() ) ;
+			// e.body.RESULT = tree.toString() ;
+			e.body.RESULT = rows ;
 	    e.control.status = { code:0 } ;
 			client.sendResult ( e ) ;
 		} ) ;
 	});
 });
-client.on('end', function()
+client.on ( 'end', function()
 {
-  console.log('socket disconnected');
+  // console.log('socket disconnected');
 });

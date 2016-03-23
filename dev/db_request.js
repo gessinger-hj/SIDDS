@@ -14,7 +14,7 @@ console.log ( " ----------result: function()----------------" ) ;
             }
             else
             {
-console.log ( e.body.RESULT.toString() ) ;
+gepard.log ( e.body.RESULT ) ;
             }
              this.end() ;
            }

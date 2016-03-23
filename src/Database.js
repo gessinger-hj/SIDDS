@@ -12,6 +12,16 @@ var Database = function ( url )
   if ( this.url.toUpperCase().indexOf ( "SQLITE" ) >= 0 )
   {
     this._SQLITE = true ;
+    var pos = this.url.indexOf ( "://" ) ;
+    if ( pos > 0 )
+    {
+      this.file = this.url.substring ( pos + 3 ) ;
+    }
+    else
+    {
+      pos = this.url.indexOf ( ":" ) ;
+      this.file = this.url.substring ( pos + 1 ) ;
+    }
   }
   else
   if ( this.url.toUpperCase().indexOf ( "POSTGRES" ) >= 0 )
@@ -27,16 +37,119 @@ Database.prototype.toString = function()
 {
   return "(Database)[url=" + this.url + "]" ;
 };
-Database.prototype.getConnection = function()
-{
-  return this._getConnection() ;
-};
-Database.prototype._getConnection = function()
+Database.prototype.getConnection = function ( callback )
 {
   if ( this.connection )
   {
+    if ( typeof callback === 'function' )
+    {
+      callback.call ( this, null, this.connection ) ;
+    }
     return this.connection ;
   }
+  if ( typeof callback === 'function' )
+  {
+    this._getConnectionAsync ( callback ) ;
+    return ;
+  }
+  return this._getConnection ( callback ) ;
+};
+Database.prototype._getConnectionAsync = function ( callback )
+{
+  var thiz = this ;
+  if ( this._MYSQL )
+  {
+    var mysql =  require('mysql');
+    if ( ! this.pool )
+    {
+      this.pool = mysql.createPool ( this.url )
+    }
+    this.pool.getConnection ( function ( err, connection )
+    {
+      thiz.connection = connection ;
+      if ( err )
+      {
+        callback.call ( thiz, err, connection ) ;
+        return ;
+      }
+      thiz.connection.connect();
+      thiz.connection.q = function ( _sql, params, stdCallback )
+      { 
+        this.query ( _sql, params, function ( err, rows, columns )
+        { 
+          return stdCallback ( err, { rows:rows, columns:columns } ) ; 
+        });
+      };
+      callback.call ( thiz, err, thiz.connection ) ;
+    });
+  }
+  else
+  if ( this._SQLITE )
+  {
+    this._SYSDATE = "CURRENT_TIMESTAMP" ;
+    this._UNIQUE = "DISTINCT" ;
+    var sql = require('sql.js');
+    var fs = require('fs');
+    var fileExists = false ;
+    try
+    {
+      fs.statSync ( this.file ) ;
+      fileExists = true ;
+    }
+    catch ( exc )
+    {
+      console.log ( exc ) ;
+    }
+    if ( fileExists )
+    {
+      var filebuffer = fs.readFileSync ( this.file ) ;
+      this.connection = new sql.Database ( filebuffer ) ;
+    }
+    else
+    {
+      this.connection = new sql.Database() ;
+    }
+    callback.call ( this, null, this.connection ) ;
+  }
+  else
+  if ( this._POSTGRES )
+  {
+    this.pg = require('pg');
+    this.pg.connect ( this.url, function ( err, client, done )
+    { 
+      thiz.connection = client ;
+      if ( err )
+      {
+        var pool = thiz.pg.pools.getOrCreate()
+        pool.destroy ( thiz.connection ) ;
+        thiz.connection = null ;
+        callback.call ( thiz, err, thiz.connection ) ;
+        return ;
+      }
+      thiz.connection.q = function ( _sql, params, stdCallback )
+      {
+        if ( typeof params === 'function' )
+        {
+          stdCallback = params ;
+          this.query ( _sql, function ( err, result )
+          {
+            return stdCallback ( err, { err:err, result:result } ) ; 
+          });
+        }
+        else
+        {
+          this.query ( _sql, params, function ( err, result )
+          { 
+            return stdCallback ( err, { err:err, result:result } ) ; 
+          });
+        }
+      };
+      callback.call ( thiz, err, thiz.connection ) ;
+    });
+  }
+};
+Database.prototype._getConnection = function()
+{
   if ( this._MYSQL )
   {
     var mysql =  require('mysql');
@@ -68,9 +181,9 @@ Database.prototype._getConnection = function()
     this.connection.connect();
     this.connection.q = function ( _sql, params, stdCallback )
     { 
-      this.query ( _sql, params, function(err,rows,columns)
+      this.query ( _sql, params, function ( err, rows, columns )
       { 
-        return stdCallback(err,{rows:rows,columns:columns}); 
+        return stdCallback ( err, { rows:rows, columns:columns } ) ; 
       });
     };
   }
@@ -80,7 +193,6 @@ Database.prototype._getConnection = function()
     this._SYSDATE = "CURRENT_TIMESTAMP" ;
     this._UNIQUE = "DISTINCT" ;
     var sql = require('sql.js');
-    this.file = this.url.substring ( this.url.indexOf ( ':' ) + 1 ) ;
     var fs = require('fs');
     var fileExists = false ;
     try
@@ -206,25 +318,71 @@ Database.prototype.disconnect = function()
   }
   this.connection = null ;
 };
-Database.prototype.select = function ( sql, hostVars )
+Database.prototype.select = function ( sql, hostVars, callback )
 {
   var result ;
+  var thiz = this ;
+  if ( typeof hostVars === 'function' )
+  {
+    callback = hostVars ;
+    hostVars = null ;
+  }
+  if ( this._SQLITE )
+  {
+    if ( Array.isArray ( hostVars ) )
+    {
+      var stmt = this.connection.prepare ( sql, hostVars ) ;
+      result = [] ;
+      while ( stmt.step() )
+      {
+        result.push ( stmt.getAsObject() ) ;
+      }
+    }
+    else
+    {
+      var stmt = this.connection.prepare ( sql ) ;
+      result = [] ;
+      while ( stmt.step() )
+      {
+        result.push ( stmt.getAsObject() ) ;
+      }
+    }
+    if ( typeof callback === 'function' )
+    {
+      callback.call ( this, null, result ) ;
+      return ;
+    }
+    return result
+  }
+  else
   if ( this._MYSQL )
   {
   // result.insertId, TODO for mySQL
-    result = wait.forMethod( this.connection, "q", sql, hostVars ); 
-    return result.rows ;
-  }
-  else
-  if ( this._SQLITE )
-  {
-    var stmt = this.connection.prepare ( sql, hostVars ) ;
-    result = [] ;
-    while ( stmt.step() )
+    if ( callback )
     {
-      result.push ( stmt.getAsObject() ) ;
+      if ( hostVars )
+      {
+        this.connection.query ( sql, hostVars, function ( err, rows )
+        {
+          callback.call ( thiz, err, rows ) ;
+        }) ;
+      }
+      else
+      {
+        this.connection.query ( sql, function ( err, rows )
+        {
+          callback.call ( thiz, err, rows ) ;
+        }) ;
+      }
+      return ;
     }
-    return result
+    result = wait.forMethod ( this.connection, "q", sql, hostVars ); 
+    if ( response.err )
+    {
+      console.log ( err ) ;
+      return ;
+    }
+    return result.rows ;
   }
   else
   if ( this._POSTGRES )
@@ -235,13 +393,29 @@ Database.prototype.select = function ( sql, hostVars )
       if ( sql1.indexOf ( '?' ) < 0 ) break ;
       sql1 = sql1.replace ( /\?/g, "$" + i ) ;
     }
+    if ( callback )
+    {
+      if ( hostVars )
+      {
+        this.connection.query ( sql1, hostVars, function ( err, result )
+        {
+          callback.call ( thiz, err, result.rows ) ;
+        }) ;
+      }
+      else
+      {
+        this.connection.query ( sql1, function ( err, result )
+        {
+          callback.call ( thiz, err, result.rows ) ;
+        }) ;
+      }
+      return ;
+    }
     var response = wait.forMethod ( this.connection, "q", sql1, hostVars ) ;
     if ( response.err )
     {
       console.log ( err ) ;
-      delete connection["q"] ;
-      var pool = this.pg.getOrCreate() ;
-      pool.destroy ( connection ) ;
+      this.close() ;
       return ;
     }
     return response.result.rows ; //.rows[0]);
