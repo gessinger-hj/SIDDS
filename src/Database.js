@@ -59,6 +59,7 @@ Database.prototype._getConnectionAsync = function ( callback )
   var thiz = this ;
   if ( this._MYSQL )
   {
+// SET autocommit = 1 / 0
     var mysql =  require('mysql');
     if ( ! this.pool )
     {
@@ -255,6 +256,42 @@ Database.prototype._getConnection = function()
   }
   return this.connection ;
 };
+Database.prototype.commit = function()
+{
+  if ( this._SQLITE )
+  {
+    if ( this.connection )
+    {
+      var fs = require ( 'fs' ) ;
+      var data = this.connection.export() ;
+      var buffer = new Buffer ( data ) ;
+      fs.writeFileSync( this.file, buffer ) ;
+      this.hasChanged = false ;
+    }
+    return ;
+  }
+  if ( this._MYSQL )
+  {
+    if ( this.connection )
+    {
+      this.connection.commit() ;
+    }
+    return ;
+  }
+  if ( this._POSTGRES )
+  {
+    if ( this.connection )
+    {
+      this.connection.query ( 'COMMIT', function commit_function (err,client)
+      {
+        if ( err )
+        {
+          console.log ( err ) ;
+        }
+      }) ;
+    }
+  }
+};
 Database.prototype.close = function()
 {
   if ( this._SQLITE )
@@ -377,9 +414,9 @@ Database.prototype.select = function ( sql, hostVars, callback )
       return ;
     }
     result = wait.forMethod ( this.connection, "q", sql, hostVars ); 
-    if ( response.err )
+    if ( result.err )
     {
-      console.log ( err ) ;
+      console.log ( result.err ) ;
       return ;
     }
     return result.rows ;
@@ -420,6 +457,120 @@ Database.prototype.select = function ( sql, hostVars, callback )
     }
     return response.result.rows ; //.rows[0]);
   }
+};
+Database.prototype.update = function ( sql, hostVars )
+{
+  this.hasChanged = true ;
+  if ( this._SQLITE )
+  {
+    if ( Array.isArray ( hostVars ) )
+      this.connection.run ( sql, hostVars ) ;
+    else
+      this.connection.run ( sql ) ;
+  }
+  else
+  if ( this._MYSQL )
+  {
+    if ( Array.isArray ( hostVars ) )
+      this.connection.query ( sql, hostVars ) ;
+    else
+      this.connection.query ( sql ) ;
+  }
+  else
+  if ( this._POSTGRES )
+  {
+    var sql1 = sql ;
+    for ( var i = 1 ; i < 100 ; i++ )
+    {
+      if ( sql1.indexOf ( '?' ) < 0 ) break ;
+      sql1 = sql1.replace ( /\?/g, "$" + i ) ;
+    }
+    if ( Array.isArray ( hostVars ) )
+      this.connection.query ( sql1, hostVars ) ;
+    else
+      this.connection.query ( sql1 ) ;
+  }
+};
+Database.prototype.insert = function ( sql, hostVars, callback )
+{
+  var result ;
+  var thiz = this ;
+  var orig_callback = callback ;
+  if ( typeof hostVars === 'function' )
+  {
+    orig_callback = hostVars ;
+  }
+  var insertId = -1 ; 
+  if ( typeof orig_callback === 'function' )
+  {
+    var this_callback = function ( err, rows )
+    {
+      if ( err )
+      {
+        orig_callback.call ( thiz, err, { insertId:insertId } ) ;
+        return ;
+      }
+      if ( thiz._MYSQL )
+      {
+        if ( rows.insertId )
+        {
+          insertId = rows.insertId ;
+        }
+        orig_callback.call ( thiz, err, { insertId:insertId } ) ;
+      }
+      else
+      if ( thiz._POSTGRES )
+      {
+        this.select ( "SELECT LASTVAL()", function ( err, rows )
+        {
+          if ( rows.length )
+          {
+            insertId = rows[0].lastval ;
+          }
+          orig_callback.call ( thiz, err, { insertId:insertId } ) ;
+        });
+      }
+      if ( thiz._SQLITE )
+      {
+        thiz.select ( "SELECT last_insert_rowid()", function ( err, rows )
+        {
+          if ( rows.length )
+          {
+            insertId = rows[0]["last_insert_rowid()"] ;
+          }
+          orig_callback.call ( thiz, err, { insertId:insertId } ) ;
+        });
+      }
+    };
+    this.select ( sql, hostVars, this_callback ) ;
+    return ;
+  }
+  var rows = this.select ( sql, hostVars, callback ) ;
+  if ( thiz._MYSQL )
+  {
+    if ( rows.insertId )
+    {
+      insertId = rows.insertId ;
+    }
+  }
+  else
+  if ( thiz._POSTGRES )
+  {
+    rows = this.select ( "SELECT LASTVAL()" ) ;
+    if ( rows.length )
+    {
+      insertId = rows[0].lastval ;
+    }
+  }
+  if ( thiz._SQLITE )
+  {
+    rows = thiz.select ( "SELECT last_insert_rowid()" ) ;
+    if ( rows.length )
+    {
+      insertId = rows[0]["last_insert_rowid()"] ;
+    }
+  }
+  return { insertId:insertId } ;
 };
 
 module.exports = Database ;

@@ -88,7 +88,7 @@ UserDB.prototype.verifyUser = function ( userIn, callback )
         var buf = crypto.randomBytes ( 4 ) ;
         var salt = buf.readInt32LE() ;
         var md5pwd = crypto.createHash('md5').update( user.pwd ).digest("hex") ;
-console.log ( "md5pwd=" + md5pwd ) ;
+        this.db.update ( "update t_identity set salt=?, pwd=? where identity_key=?", [ salt, md5pwd, user.identity_key ] ) ;
       }
     }
     userIn._pwd = "" ;
@@ -207,7 +207,7 @@ UserDB.prototype.collectRights = function ( userIn
   }
 };
 
-module.exports = Database ;
+module.exports = UserDB ;
 
 if ( require.main === module )
 {
@@ -237,6 +237,7 @@ if ( require.main === module )
     //     throw new Error ( "Invalid user." ) ;
     //   }
     // }
+    udb.db.commit() ;
     udb.db.disconnect() ;
   } ) ;
 }

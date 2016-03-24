@@ -3,7 +3,7 @@ CREATE TABLE T_IDENTITY_TYPE
   identity_type_key   INTEGER NOT NULL AUTO_INCREMENT,
   identity_type_name  VARCHAR(64)         NOT NULL,
   description         VARCHAR(128),
-  last_modified       DATETIME                      DEFAULT current_timestamp               NOT NULL,
+  last_modified       DATETIME                      NOT NULL,
   operator_modified   INTEGER,
   PRIMARY KEY ( identity_type_key )
 );
@@ -19,9 +19,9 @@ CREATE TABLE T_IDENTITY
   enabled              CHAR(1)                  DEFAULT '1'                   NOT NULL,
   login_enabled        CHAR(1)                  DEFAULT  '1'                   NOT NULL,
   pwd                  VARCHAR(128)                NULL,
-  start_date           datetime    DEFAULT current_timestamp NOT NULL,
-  end_date             datetime                    DEFAULT '9999-01-01 00:00:00' NOT NULL,
-  last_modified        datetime             DEFAULT current_timestamp   NOT NULL,
+  start_date           datetime NOT NULL,
+  end_date             datetime NOT NULL,
+  last_modified        datetime NOT NULL,
   operator_modified    INTEGER                      NULL,
   first_name           VARCHAR(128)                NULL,
   last_name            VARCHAR(128)                NULL,
@@ -42,7 +42,7 @@ CREATE TABLE T_IDENTITY_TO_IDENTITY
 (
   parent_identity_key  INTEGER                  NOT NULL,
   identity_key         INTEGER                  NOT NULL,
-  last_modified        DATEtime                 DEFAULT current_timestamp               NOT NULL,
+  last_modified        DATEtime                 NOT NULL,
   operator_modified    INTEGER,
   FOREIGN KEY(PARENT_IDENTITY_KEY) REFERENCES T_IDENTITY(IDENTITY_KEY) ON DELETE CASCADE,
   FOREIGN KEY(IDENTITY_KEY) REFERENCES T_IDENTITY(IDENTITY_KEY) ON DELETE CASCADE
@@ -55,7 +55,7 @@ CREATE TABLE T_RIGHT
   right_key          INTEGER AUTO_INCREMENT NOT NULL,
   right_name         VARCHAR(64)          NOT NULL,
   description        VARCHAR(128),
-  last_modified      DATETIME                       DEFAULT current_timestamp               NOT NULL,
+  last_modified      DATETIME                       NOT NULL,
   operator_modified  INTEGER,
   PRIMARY KEY ( RIGHT_KEY )
 );
@@ -64,13 +64,18 @@ CREATE TABLE T_IDENTITY_TO_RIGHT
 (
   identity_key       INTEGER                    NOT NULL,
   right_key          INTEGER                    NOT NULL,
-  last_modified      datetime                       DEFAULT current_timestamp               NOT NULL,
+  last_modified      datetime                       NOT NULL,
   right_value        VARCHAR(512)         DEFAULT 'true' NOT NULL,
   right_context      VARCHAR(128)         DEFAULT '*'                   NOT NULL,
   operator_modified  INTEGER,
   FOREIGN KEY(IDENTITY_KEY) REFERENCES T_IDENTITY(IDENTITY_KEY) ON DELETE CASCADE,
   FOREIGN KEY(RIGHT_KEY) REFERENCES T_RIGHT(RIGHT_KEY) ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS I_T_IDENTITY_TYPE
+ON T_IDENTITY_TYPE
+(IDENTITY_TYPE_NAME)
+;
 
 CREATE UNIQUE INDEX IF NOT EXISTS I_T_IDENTITY_NAME
 ON T_IDENTITY
@@ -96,51 +101,85 @@ ON T_IDENTITY_TO_RIGHT
 
 delimiter //
 CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_LM
-AFTER UPDATE ON T_IDENTITY FOR EACH ROW
+BEFORE UPDATE ON T_IDENTITY FOR EACH ROW
 BEGIN
-  update T_IDENTITY set LAST_MODIFIED  = current_timestamp where IDENTITY_KEY=new.IDENTITY_KEY ;
+  set new.LAST_MODIFIED  = current_timestamp ;
+END;//
+
+delimiter //
+CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_LM2
+BEFORE INSERT ON T_IDENTITY FOR EACH ROW
+BEGIN
+  set new.LAST_MODIFIED  = current_timestamp ;
+  set new.start_date = current_timestamp ;
+  set new.end_date = '9999-01-01 00:00:00' ;
 END;//
 
 ------------
 
 delimiter //
 CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_IDENTITY_LM
-AFTER UPDATE ON T_IDENTITY_TO_IDENTITY FOR EACH ROW
+BEFORE UPDATE ON T_IDENTITY_TO_IDENTITY FOR EACH ROW
 BEGIN
-  update T_IDENTITY_TO_IDENTITY set LAST_MODIFIED = current_timestamp
-   where IDENTITY_KEY=new.IDENTITY_KEY
-     and PARENT_IDENTITY_KEY=new.PARENT_IDENTITY_KEY ;
+  set new.LAST_MODIFIED = current_timestamp ;
+END;//
+
+delimiter //
+CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_IDENTITY_LM2
+BEFORE INSERT ON T_IDENTITY_TO_IDENTITY FOR EACH ROW
+BEGIN
+  set new.LAST_MODIFIED = current_timestamp ;
 END;//
 
 ------------
 
 delimiter //
 CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_RIGHT_LM
-AFTER UPDATE ON T_IDENTITY_TO_RIGHT FOR EACH ROW
+BEFORE UPDATE ON T_IDENTITY_TO_RIGHT FOR EACH ROW
 BEGIN
-  update T_IDENTITY_TO_RIGHT set LAST_MODIFIED = current_timestamp
-   where IDENTITY_KEY=new.IDENTITY_KEY
-     and RIGHT_KEY=new.RIGHT_KEY ;
+  set new.LAST_MODIFIED = current_timestamp ;
+END;//
+
+delimiter //
+CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_RIGHT_LM2
+BEFORE INSERT ON T_IDENTITY_TO_RIGHT FOR EACH ROW
+BEGIN
+  set new.LAST_MODIFIED = current_timestamp ;
 END;//
 
 ------------
 
 delimiter //
 CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TYPE_LM
-AFTER UPDATE ON T_IDENTITY_TYPE FOR EACH ROW
+BEFORE UPDATE ON T_IDENTITY_TYPE FOR EACH ROW
 BEGIN
-  update T_IDENTITY_TYPE set LAST_MODIFIED  = current_timestamp
-   where IDENTITY_TYPE_KEY=new.IDENTITY_TYPE_KEY ;
+  set new.LAST_MODIFIED  = current_timestamp ;
+END;//
+
+delimiter //
+CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TYPE_LM2
+BEFORE INSERT ON T_IDENTITY_TYPE FOR EACH ROW
+BEGIN
+  set new.LAST_MODIFIED  = current_timestamp ;
 END;//
 
 ------------
 
 delimiter //
 CREATE TRIGGER IF NOT EXISTS TR_U_T_RIGHT_LM
-AFTER UPDATE ON T_RIGHT FOR EACH ROW
+BEFORE UPDATE ON T_RIGHT FOR EACH ROW
 BEGIN
-  update T_RIGHT set LAST_MODIFIED  = current_timestamp where RIGHT_KEY=new.RIGHT_KEY ;
+  set new.LAST_MODIFIED  = current_timestamp ;
 END;//
+
+delimiter //
+CREATE TRIGGER IF NOT EXISTS TR_U_T_RIGHT_LM2
+BEFORE INSERT ON T_RIGHT FOR EACH ROW
+BEGIN
+  set new.LAST_MODIFIED  = current_timestamp ;
+END;//
+
+------------
 
 CREATE view V_IDENTITY_TO_IDENTITY
 AS 
