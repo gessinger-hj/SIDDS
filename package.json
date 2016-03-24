@@ -19,7 +19,7 @@
   "licenses": [
     {
       "type": "MIT",
-      "url": "https://github.com/gessinger-hj/sidds/LICENSE.md"
+      "url": "https://github.com/gessinger-hj/sidds/LICENSE"
     }
   ],
   "readmeFilename": "README.md",
@@ -31,14 +31,11 @@
     "node": ">= 0.10"
   },
   "dependencies": {
+    "mysql": "^2.10.2",
     "pg": "^4.5.1",
+    "sql.js": "^0.3.1",
     "wait.for": "^0.6.6"
   },
-  "devDependencies": {
-    "asyncawait": "^1.0.3",
-    "node-mysql": "^0.4.2",
-    "sql.js": "^0.2.21",
-    "wait.for": "^0.6.6"
-  },
+  "devDependencies": {},
   "bin": {}
 }

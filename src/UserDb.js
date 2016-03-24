@@ -1,3 +1,6 @@
+#!/usr/bin/env node
+
+
 var gepard = require ( "gepard" ) ;
 var wait = require ( "wait.for" ) ;
 var Database = require ( "./Database" ) ;
