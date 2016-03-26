@@ -1,4 +1,4 @@
-CREATE TABLE T_IDENTITY_TYPE
+CREATE TABLE t_identity_type
 (
   identity_type_key   INTEGER NOT NULL AUTO_INCREMENT,
   identity_type_name  VARCHAR(64)         NOT NULL,
@@ -8,8 +8,7 @@ CREATE TABLE T_IDENTITY_TYPE
   PRIMARY KEY ( identity_type_key )
 );
 
-  --START_DATE           datetime    default current_timestamp            NOT NULL,
-CREATE TABLE T_IDENTITY
+CREATE TABLE t_identity
 (
   identity_key         INTEGER   AUTO_INCREMENT,
   identity_name        VARCHAR(64)             NOT NULL,
@@ -38,29 +37,29 @@ CREATE TABLE T_IDENTITY
         ON DELETE CASCADE
 );
 
-CREATE TABLE T_IDENTITY_TO_IDENTITY
+CREATE TABLE t_identity_to_identity
 (
   parent_identity_key  INTEGER                  NOT NULL,
   identity_key         INTEGER                  NOT NULL,
   last_modified        DATEtime                 NOT NULL,
   operator_modified    INTEGER,
-  FOREIGN KEY(PARENT_IDENTITY_KEY) REFERENCES T_IDENTITY(IDENTITY_KEY) ON DELETE CASCADE,
-  FOREIGN KEY(IDENTITY_KEY) REFERENCES T_IDENTITY(IDENTITY_KEY) ON DELETE CASCADE
+  FOREIGN KEY(PARENt_identity_KEY) REFERENCES t_identity(identity_key) ON DELETE CASCADE,
+  FOREIGN KEY(identity_key) REFERENCES t_identity(identity_key) ON DELETE CASCADE
 );
 
----------------
+-- -------------
 
-CREATE TABLE T_RIGHT
+CREATE TABLE t_right
 (
   right_key          INTEGER AUTO_INCREMENT NOT NULL,
   right_name         VARCHAR(64)          NOT NULL,
   description        VARCHAR(128),
   last_modified      DATETIME                       NOT NULL,
   operator_modified  INTEGER,
-  PRIMARY KEY ( RIGHT_KEY )
+  PRIMARY KEY ( right_key )
 );
 
-CREATE TABLE T_IDENTITY_TO_RIGHT
+CREATE TABLE t_identity_to_right
 (
   identity_key       INTEGER                    NOT NULL,
   right_key          INTEGER                    NOT NULL,
@@ -68,120 +67,108 @@ CREATE TABLE T_IDENTITY_TO_RIGHT
   right_value        VARCHAR(512)         DEFAULT 'true' NOT NULL,
   right_context      VARCHAR(128)         DEFAULT '*'                   NOT NULL,
   operator_modified  INTEGER,
-  FOREIGN KEY(IDENTITY_KEY) REFERENCES T_IDENTITY(IDENTITY_KEY) ON DELETE CASCADE,
-  FOREIGN KEY(RIGHT_KEY) REFERENCES T_RIGHT(RIGHT_KEY) ON DELETE CASCADE
+  FOREIGN KEY(identity_key) REFERENCES t_identity(identity_key) ON DELETE CASCADE,
+  FOREIGN KEY(right_key) REFERENCES t_right(right_key) ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS I_T_IDENTITY_TYPE
-ON T_IDENTITY_TYPE
-(IDENTITY_TYPE_NAME)
+CREATE UNIQUE INDEX i_t_identity_type
+ON t_identity_type
+(identity_type_name)
 ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS I_T_IDENTITY_NAME
-ON T_IDENTITY
-(IDENTITY_NAME)
+CREATE UNIQUE INDEX i_t_identity_name
+ON t_identity
+(identity_name)
 ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS I_T_RIGHT_NAME
-ON T_RIGHT
-(RIGHT_NAME)
+CREATE UNIQUE INDEX i_t_right_name
+ON t_right
+(right_name)
 ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS I_T_IDENTITY_TO_IDENTITY
-ON T_IDENTITY_TO_IDENTITY
-(PARENT_IDENTITY_KEY, IDENTITY_KEY)
+CREATE UNIQUE INDEX i_t_identity_to_identity
+ON t_identity_to_identity
+(parent_identity_key, identity_key)
 ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS I_T_IDENTITY_TO_RIGHT
-ON T_IDENTITY_TO_RIGHT
-(IDENTITY_KEY, RIGHT_KEY)
+CREATE UNIQUE INDEX i_t_identity_to_right
+ON t_identity_to_right
+(identity_key, right_key)
 ;
-
-----------------
 
 delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_LM
-BEFORE UPDATE ON T_IDENTITY FOR EACH ROW
+CREATE TRIGGER tr_u_t_identity_lm
+BEFORE UPDATE ON t_identity FOR EACH ROW
 BEGIN
-  set new.LAST_MODIFIED  = current_timestamp ;
+  set new.last_modified  = current_timestamp ;
 END;//
 
 delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_LM2
-BEFORE INSERT ON T_IDENTITY FOR EACH ROW
+CREATE TRIGGER tr_u_t_identity_lm2
+BEFORE INSERT ON t_identity FOR EACH ROW
 BEGIN
-  set new.LAST_MODIFIED  = current_timestamp ;
+  set new.last_modified  = current_timestamp ;
   set new.start_date = current_timestamp ;
   set new.end_date = '9999-01-01 00:00:00' ;
 END;//
 
-------------
-
 delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_IDENTITY_LM
-BEFORE UPDATE ON T_IDENTITY_TO_IDENTITY FOR EACH ROW
+CREATE TRIGGER tr_u_t_identity_to_identity_lm
+BEFORE UPDATE ON t_identity_to_identity FOR EACH ROW
 BEGIN
-  set new.LAST_MODIFIED = current_timestamp ;
+  set new.last_modified = current_timestamp ;
 END;//
 
 delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_IDENTITY_LM2
-BEFORE INSERT ON T_IDENTITY_TO_IDENTITY FOR EACH ROW
+CREATE TRIGGER tr_u_t_identity_to_identity_lm2
+BEFORE INSERT ON t_identity_to_identity FOR EACH ROW
 BEGIN
-  set new.LAST_MODIFIED = current_timestamp ;
-END;//
-
-------------
-
-delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_RIGHT_LM
-BEFORE UPDATE ON T_IDENTITY_TO_RIGHT FOR EACH ROW
-BEGIN
-  set new.LAST_MODIFIED = current_timestamp ;
+  set new.last_modified = current_timestamp ;
 END;//
 
 delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TO_RIGHT_LM2
-BEFORE INSERT ON T_IDENTITY_TO_RIGHT FOR EACH ROW
+CREATE TRIGGER tr_u_t_identity_to_right_lm
+BEFORE UPDATE ON t_identity_to_right FOR EACH ROW
 BEGIN
-  set new.LAST_MODIFIED = current_timestamp ;
-END;//
-
-------------
-
-delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TYPE_LM
-BEFORE UPDATE ON T_IDENTITY_TYPE FOR EACH ROW
-BEGIN
-  set new.LAST_MODIFIED  = current_timestamp ;
+  set new.last_modified = current_timestamp ;
 END;//
 
 delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_IDENTITY_TYPE_LM2
-BEFORE INSERT ON T_IDENTITY_TYPE FOR EACH ROW
+CREATE TRIGGER tr_u_t_identity_to_right_lm2
+BEFORE INSERT ON t_identity_to_right FOR EACH ROW
 BEGIN
-  set new.LAST_MODIFIED  = current_timestamp ;
-END;//
-
-------------
-
-delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_RIGHT_LM
-BEFORE UPDATE ON T_RIGHT FOR EACH ROW
-BEGIN
-  set new.LAST_MODIFIED  = current_timestamp ;
+  set new.last_modified = current_timestamp ;
 END;//
 
 delimiter //
-CREATE TRIGGER IF NOT EXISTS TR_U_T_RIGHT_LM2
-BEFORE INSERT ON T_RIGHT FOR EACH ROW
+CREATE TRIGGER tr_u_t_identity_type_lm
+BEFORE UPDATE ON t_identity_type FOR EACH ROW
 BEGIN
-  set new.LAST_MODIFIED  = current_timestamp ;
+  set new.last_modified  = current_timestamp ;
 END;//
 
-------------
+delimiter //
+CREATE TRIGGER tr_u_t_identity_type_lm2
+BEFORE INSERT ON t_identity_type FOR EACH ROW
+BEGIN
+  set new.last_modified  = current_timestamp ;
+END;//
 
-CREATE view V_IDENTITY_TO_IDENTITY
+delimiter //
+CREATE TRIGGER tr_u_t_right_lm
+BEFORE UPDATE ON t_right FOR EACH ROW
+BEGIN
+  set new.last_modified  = current_timestamp ;
+END;//
+
+delimiter //
+CREATE TRIGGER tr_u_t_right_lm2
+BEFORE INSERT ON t_right FOR EACH ROW
+BEGIN
+  set new.last_modified  = current_timestamp ;
+END;//
+
+CREATE view v_identity_to_identity
 AS 
 SELECT 
   a.identity_key 
@@ -192,11 +179,11 @@ SELECT
 , b.end_date 
 , c.identity_type_key 
 , c.identity_type_name 
-from T_IDENTITY_TO_IDENTITY a, T_IDENTITY b, T_IDENTITY_TYPE c 
-where a.PARENT_IDENTITY_KEY=b.IDENTITY_KEY and b.IDENTITY_TYPE_KEY=c.IDENTITY_TYPE_KEY;
+from t_identity_to_identity a, t_identity b, t_identity_type c 
+where a.parent_identity_key=b.identity_key and b.identity_type_key=c.identity_type_key;
 
 
-CREATE VIEW V_IDENTITY_TO_RIGHT
+CREATE VIEW v_identity_to_right
 AS 
 SELECT 
   B.identity_key 
@@ -206,11 +193,11 @@ SELECT
 , A.right_value 
 , A.right_context 
 , A.last_modified 
-FROM T_IDENTITY_TO_RIGHT A, T_IDENTITY B, T_RIGHT C 
-WHERE A.IDENTITY_KEY = B.IDENTITY_KEY 
-AND A.RIGHT_KEY = C.RIGHT_KEY;
+FROM t_identity_to_right A, t_identity B, t_right C 
+WHERE A.identity_key = B.identity_key 
+AND A.right_key = C.right_key;
 
-CREATE VIEW V_IDENTITY
+CREATE VIEW v_identity
 AS 
 SELECT 
   a.identity_name 
@@ -222,7 +209,7 @@ SELECT
 , c.identity_type_name 
 , a.description 
 , b.parent_identity_key 
--- , b.PARENT_IDENTITY_NAME 
+-- , b.PARENt_identity_NAME 
 , a.enabled 
 , a.start_date 
 , a.end_date 
@@ -235,4 +222,4 @@ SELECT
 , a.external_key
 , a.external_id
  from t_identity a, t_identity_to_identity b, t_identity_type c 
-where a.IDENTITY_KEY=b.IDENTITY_KEY and a.IDENTITY_TYPE_KEY=c.IDENTITY_TYPE_KEY;
+where a.identity_key=b.identity_key and a.identity_type_key=c.identity_type_key;

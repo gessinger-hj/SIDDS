@@ -483,7 +483,7 @@ Database.prototype.update = function ( sql, hostVars )
     for ( var i = 1 ; i < 100 ; i++ )
     {
       if ( sql1.indexOf ( '?' ) < 0 ) break ;
-      sql1 = sql1.replace ( /\?/g, "$" + i ) ;
+      sql1 = sql1.replace ( "?", "$" + i ) ;
     }
     if ( Array.isArray ( hostVars ) )
       this.connection.query ( sql1, hostVars ) ;
