@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 var gepard = require ( "gepard" ) ;
 
 var client = gepard.getClient() ;

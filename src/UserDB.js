@@ -59,15 +59,27 @@ UserDB.prototype.toString = function()
 {
   return "(UserDB)" ;
 };
-UserDB.prototype.verifyUser = function ( userIn, callback )
+UserDB.prototype._verifyUser = function ( userIn, callback )
 {
   this.db.getConnection() ;
   try
   {
-    var userList               = this.db.select ( S1, [ userIn.id.toUpperCase() ] ) ;
-    var user                   = userList[0] ;
-    userIn.key                 = user.identity_key ;
-    userIn.id                  = user.identity_name ;
+    var userList = this.db.select ( S1, [ userIn.id.toUpperCase() ] ) ;
+    if ( ! userList.length )
+    {
+      try
+      {
+        callback.call ( this, "Invalid credentials", null ) ;
+      }
+      catch ( exc )
+      {
+        console.log ( exc ) ;
+      }
+      return ;
+    }
+    var user     = userList[0] ;
+    userIn.key   = user.identity_key ;
+    userIn.id    = user.identity_name ;
     if ( userIn["_pwd"] )
     {
       if ( ! user.salt )
@@ -76,7 +88,7 @@ UserDB.prototype.verifyUser = function ( userIn, callback )
         {
           try
           {
-            callback.call ( this, "Invalid credentials" ) ;
+            callback.call ( this, "Invalid credentials", null ) ;
           }
           catch ( exc )
           {
@@ -89,6 +101,23 @@ UserDB.prototype.verifyUser = function ( userIn, callback )
         var salt = buf.readInt32LE() ;
         var md5pwd = crypto.createHash('md5').update( user.pwd ).digest("hex") ;
         this.db.update ( "update t_identity set salt=?, pwd=? where identity_key=?", [ salt, md5pwd, user.identity_key ] ) ;
+      }
+      else
+      {
+        var crypto = require ( "crypto" ) ;
+        var md5pwd = crypto.createHash('md5').update( userIn._pwd ).digest("hex") ;
+        if ( user.pwd !== md5pwd )
+        {
+          try
+          {
+            callback.call ( this, "Invalid credentials", null ) ;
+          }
+          catch ( exc )
+          {
+            console.log ( exc ) ;
+          }
+          return ;
+        }
       }
     }
     userIn._pwd = "" ;
@@ -137,6 +166,8 @@ UserDB.prototype.collectParents = function ( userIn
       if ( row.parent_identity_name )
       {
         if ( ! userIn.groups ) userIn.groups = { keys:{}, rights:{} } ;
+        if ( ! userIn.groups.keys ) userIn.groups.keys = {} ;
+        if ( ! userIn.groups.rights ) userIn.groups.rights = {} ;
         userIn.groups.keys[row.parent_identity_name]     = row.parent_identity_key ;
         identityKeyToGroup["" + row.parent_identity_key] = row.parent_identity_name ;
       }
@@ -206,7 +237,27 @@ UserDB.prototype.collectRights = function ( userIn
     console.log ( exc ) ;
   }
 };
-
+UserDB.prototype.verifyUser = function ( userIn, callback )
+{
+  var thiz = this ;
+  wait.launchFiber ( this._verifyUser.bind ( this ), userIn, function ( err, user )
+  {
+    thiz.db.commit() ;
+    thiz.db.disconnect() ;
+    callback ( err, user ) ;
+    if ( err )
+    {
+      return ;
+    }
+    // if ( verifyForLogin )
+    // {
+    //   if ( ! user.LOGIN_ENABLED )
+    //   {
+    //     throw new Error ( "Invalid user." ) ;
+    //   }
+    // }
+  } ) ;
+};
 module.exports = UserDB ;
 
 if ( require.main === module )
@@ -214,15 +265,15 @@ if ( require.main === module )
   var verifyForLogin = true ;
 
   var userIn = {} ;
-  userIn["id"] = "Miller" ;
+  userIn["id"] = gepard.getProperty ( "user.id", "Miller" ) ;
   userIn["context"] = "WEB" ;
   userIn["_pwd"] = "654321" ;
 
-  // var url = gepard.getProperty ( "dburl", "mysql://root:@localhost/sidds" ) ;
-  var url = gepard.getProperty ( "dburl", "sqlite://../test/sidds.db" ) ;
+  var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/sidds" ) ;
+  // var url = gepard.getProperty ( "dburl", "sqlite://../test/sidds.db" ) ;
   var udb = new UserDB ( url ) ;
   console.log ( "udb=" + udb.db ) ;
-  wait.launchFiber ( udb.verifyUser.bind ( udb ), userIn, function ( err, user )
+  wait.launchFiber ( udb._verifyUser.bind ( udb ), userIn, function ( err, user )
   {
     if ( err )
     {

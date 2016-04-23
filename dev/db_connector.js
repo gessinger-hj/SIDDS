@@ -1,7 +1,11 @@
+#!/usr/bin/env node
+
 var mysql = require ( 'mysql' ) ;
 var gepard = require ( 'gepard' ) ;
 var tango = require ( 'tango' ) ;
-var Database = require ( '../src/Database' ) ;
+
+var sidds = require ( 'sidds' ) ;
+var Database = sidds.Database ;
 var wait = require ( "wait.for" ) ;
 
 var Log = gepard.LogFile ;
@@ -11,12 +15,19 @@ var XmlTree = tango.Xml.XmlTree ;
 "use strict" ;
 
 var client = new gepard.Client() ;
-var dburl = gepard.getProperty ( "dburl", "mysql://root:@localhost/sidds" ) ;
+var dburl = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/sidds" ) ;
 var db = new Database ( dburl ) ;
 client.on ( "DB:REQUEST", function(e)
 {
 	db.getConnection ( function ( err, connection )
 	{
+		if ( err )
+		{
+			console.log ( err ) ;
+	    e.control.status = { code:1, reason: String ( err ) } ;
+			client.sendResult ( e ) ;
+			return ;
+		}
 		var str = "select * from t_identity";	
 		var tree = new XmlTree() ;
 		var tab = tree.add ( "cds" ) ;
