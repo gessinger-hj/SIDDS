@@ -1,5 +1,11 @@
-var gepard = require ( "gepard" ) ;
-var wait = require ( "wait.for" ) ;
+#!/usr/bin/env node
+
+"use strict"
+
+var gepard    = require ( "gepard" ) ;
+var wait      = require ( "wait.for" ) ;
+var DbRequest = require ( "./DbRequest" ) ;
+var DbResult  = require ( "./DbResult" ) ;
 
 var Database = function ( url )
 {
@@ -256,6 +262,9 @@ Database.prototype._getConnection = function()
   }
   return this.connection ;
 };
+Database.prototype.rollback = function()
+{
+};
 Database.prototype.commit = function()
 {
   if ( this._SQLITE )
@@ -355,7 +364,23 @@ Database.prototype.disconnect = function()
   }
   this.connection = null ;
 };
+Database.prototype.update = function ( sql, hostVars, callback )
+{
+  this.hasChanged = true ;
+  return this.select ( sql, hostVars, callback ) ;
+};
 Database.prototype.select = function ( sql, hostVars, callback )
+{
+  if ( ! this.connection && typeof callback === 'function' )
+  {
+    this.getConnection ( ( err, connection ) => {
+      this._query ( sql, hostVars, callback ) ;
+    }) ;
+    return ;
+  }
+  return this._query ( sql, hostVars, callback ) ;
+};
+Database.prototype._query = function ( sql, hostVars, callback )
 {
   var result ;
   var thiz = this ;
@@ -458,39 +483,6 @@ Database.prototype.select = function ( sql, hostVars, callback )
     return response.result.rows ; //.rows[0]);
   }
 };
-Database.prototype.update = function ( sql, hostVars )
-{
-  this.hasChanged = true ;
-  if ( this._SQLITE )
-  {
-    if ( Array.isArray ( hostVars ) )
-      this.connection.run ( sql, hostVars ) ;
-    else
-      this.connection.run ( sql ) ;
-  }
-  else
-  if ( this._MYSQL )
-  {
-    if ( Array.isArray ( hostVars ) )
-      this.connection.query ( sql, hostVars ) ;
-    else
-      this.connection.query ( sql ) ;
-  }
-  else
-  if ( this._POSTGRES )
-  {
-    var sql1 = sql ;
-    for ( var i = 1 ; i < 100 ; i++ )
-    {
-      if ( sql1.indexOf ( '?' ) < 0 ) break ;
-      sql1 = sql1.replace ( "?", "$" + i ) ;
-    }
-    if ( Array.isArray ( hostVars ) )
-      this.connection.query ( sql1, hostVars ) ;
-    else
-      this.connection.query ( sql1 ) ;
-  }
-};
 Database.prototype.insert = function ( sql, hostVars, callback )
 {
   var result ;
@@ -572,5 +564,286 @@ Database.prototype.insert = function ( sql, hostVars, callback )
   }
   return { insertId:insertId } ;
 };
-
+Database.prototype.getColumnsForTable = function ( tableName, callback )
+{
+  if ( this.table2Columns )
+  {
+    callback ( null, this.table2Columns ) ;
+  }
+  if ( this._MYSQL )
+  {
+    this.table2Columns = {} ;
+    if ( typeof callback === 'function' )
+    {
+      this.getConnection ( ( err, connection ) => {
+        if ( err )
+        {
+          callback ( err, null ) ;
+          return ;
+        }
+        this.select ( "SHOW COLUMNS FROM " + tableName, ( err, result ) => {
+          if ( err )
+          {
+            callback ( err, null ) ;
+            return ;
+          }
+          for ( var i = 0 ; i < result.length ; i++ )
+          {
+            var r = result[i] ;
+            if ( r.Key === "PRI" )
+            {
+              r.isPrimaryKey = true ;
+            }
+            this.table2Columns[r.Field] = r ;
+          }
+          callback ( null, this.table2Columns ) ;
+        });
+      }) ;
+    }
+    else
+    {
+      this.getConnection() ;
+      var result = this.select ( "SHOW COLUMNS FROM " + tableName ) ;
+      for ( var i = 0 ; i < result.length ; i++ )
+      {
+        var r = result[i] ;
+        if ( r.Key === "PRI" )
+        {
+          r.isPrimaryKey = true ;
+        }
+        this.table2Columns[r.Field] = r ;
+      }
+      return this.table2Columns ;
+    }
+  }
+  else
+  {
+    throw new Error ( "not implemented." ) ;
+  }
+};
+Database.prototype.setConfig = function ( config )
+{
+  this.config = config ;
+};
+Database.prototype.executeRequest = function ( request, callback )
+{
+  if ( request.action === 'select' )
+  {
+    if ( ! request.table )
+    {
+      callback ( new DbResult ( new Error ( "Missing table for action=" + request.action ) ) ) ;
+      return ;
+    }
+    if ( ! Array.isArray ( request.columns ) )
+    {
+      callback ( new DbResult ( new Error ( "Missing columns[] for action=" + request.action + " for table=" + request.table ) ) ) ;
+      return ;
+    }
+    let operation = this.config.operations[request.table] ;
+    if ( ! operation )
+    {
+      callback ( new DbResult ( new Error ( "No operation for action=" + request.action + " for table=" + request.table ) ) ) ;
+      return ;
+    }
+    let select_table = request.table ;
+    if ( operation.select_table )
+    {
+      select_table = operation.select_table ;
+    }
+    let first = true ;
+    let sql = "select " ;
+    for ( let i = 0 ; i < request.columns.length ; i++ )
+    {
+      if ( first ) first = false ;
+      else sql += "\n, " ;
+      sql += request.columns[i] ;
+    }
+    sql += " from " + select_table ;
+    if ( request.where )
+    {
+      sql += " " + where ;
+    }
+    this.select ( sql, request.hostVars, ( err, res ) => {
+      callback ( new DbResult ( err, res ) ) ;
+    });
+  }
+  else
+  if ( request.action === 'update' )
+  {
+    if ( ! request.table )
+    {
+      callback ( new DbResult ( new Error ( "Missing table for action=" + request.action ) ) ) ;
+      return ;
+    }
+    let operation = this.config.operations[request.table] ;
+    if ( ! operation )
+    {
+      callback ( new DbResult ( new Error ( "No operation for action=" + request.action + " for table=" + request.table ) ) ) ;
+      return ;
+    }
+    this.getColumnsForTable ( request.table, ( err, columns ) => {
+      if ( err )
+      {
+        callback ( new DbResult ( err ) ) ;
+        return ;
+      }
+      let sql = "update " + request.table + " set " ;
+      let foundPrimaryKeyName = null ;
+      let foundPrimaryKeyValue = null ;
+      let hostVars = [] ;
+      let first = true ;
+      for ( let key in request.row )
+      {
+        let c = columns[key] ;
+        if ( ! c )
+        {
+          console.log ( "No column:'" + key + "'" ) ;
+          continue ;
+        }
+        if ( c.isPrimaryKey )
+        {
+          foundPrimaryKeyName = key ;
+          foundPrimaryKeyValue = request.row[key] ;
+          continue ;
+        }
+        if ( operation.immutableColumns[key] )
+        {
+          continue ;
+        }
+        if ( first ) first = false ;
+        else sql += "\n, " ;
+        sql += key + "=?" ;
+        hostVars.push ( request.row[key] ) ;
+      }
+      if ( foundPrimaryKeyName )
+      {
+        sql += "\nwhere " + foundPrimaryKeyName + "=?" ;
+        hostVars.push ( foundPrimaryKeyValue ) ;
+      }
+      db.update ( sql, hostVars, ( err, rows ) => {
+        if ( err )
+        {
+          callback ( new DbResult ( err ) ) ;
+          return ;
+        }
+        callback ( new DbResult ( err, rows ) ) ;
+      } ) ;
+    });
+  }
+  else
+  {
+    callback ( new Error ( "Invalid action=" + request.action ) ) ;
+  }
+};
 module.exports = Database ;
+if ( require.main === module )
+{
+  var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/inventum" ) ;
+  // var url = gepard.getProperty ( "dburl", "sqlite://../test/sidds.db" ) ;
+  var db = new Database ( url ) ;
+  console.log ( "db=" + db ) ;
+
+  let conf = {
+    operations: {
+      "t_inventory": {
+        "immutableColumns":
+        { "operator_modified":true
+        , "created_at":true
+        , "last_modified":true
+        , "inventory_key":true
+        }
+      , "select_table": "v_inventory"
+      , "update_table": "t_inventory"
+      , "delete_table": "t_inventory"
+      }
+    }
+  } ;
+  db.setConfig ( conf ) ;
+
+  var request =
+  {
+    action: "select"
+  , table: "t_inventory"
+  , columns: [ "*" ]
+  };
+  let r = new DbRequest ( request ) ;
+  db.executeRequest ( r, ( result ) => {
+    console.log ( result.result ) ;
+    db.commit() ;
+    db.disconnect() ;
+  });
+
+  // var row =
+  // {
+  //   inventory_key: 4
+  // , inventory_name: 'Microsoft 13. Updated'
+  // , description: 'DDDxhaFUhXS /view__usp=sharing 35 bit'
+  // , staff_number: '01001'
+  // , person_first_name: 'Dietmar'
+  // , person_last_name: 'Kauer'
+  // , miscellaneous: 'first updated'
+  // , status: 'active'
+  // , created_at: "Sat Apr 16 2016 16:13:09 GMT+0200 (CEST)"
+  // , last_modified: "Fri Apr 22 2016 12:29:46 GMT+0200 (CEST)"
+  // , operator_modified: null
+  // };
+  // var request =
+  // {
+  //   action: "update"
+  // , table: "t_inventory"
+  // , row: row
+  // };
+  // let r = new DbRequest ( request ) ;
+  // db.executeRequest ( r, ( result ) => {
+  //   console.log ( result ) ;
+  //   db.commit() ;
+  //   db.disconnect() ;
+  // });
+
+
+  // console.log ( new Date ( row.last_modified ) ) ;
+  // console.log ( request ) ;
+  var thiz = this ;
+  // wait.launchFiber ( () => {
+  //   var columns = db.getColumnsForTable ( request.table ) ;
+  //   if ( request.action === "update" )
+  //   {
+  //     let sql = "update " + request.table + " set " ;
+  //     let foundPrimaryKeyName = null ;
+  //     let foundPrimaryKeyValue = null ;
+  //     let hostVars = [] ;
+  //     let first = true ;
+  //     for ( let key in row )
+  //     {
+  //       let c = columns[key] ;
+  //       if ( ! c )
+  //       {
+  //         console.log ( "No column:'" + key + "'" ) ;
+  //         continue ;
+  //       }
+  //       if ( c.isPrimaryKey )
+  //       {
+  //         foundPrimaryKeyName = key ;
+  //         foundPrimaryKeyValue = row[key] ;
+  //         continue ;
+  //       }
+  //       if ( immutableColumns[key] )
+  //       {
+  //         continue ;
+  //       }
+  //       if ( first ) first = false ;
+  //       else sql += "\n, " ;
+  //       sql += key + "=?" ;
+  //       hostVars.push ( row[key] ) ;
+  //     }
+  //     if ( foundPrimaryKeyName )
+  //     {
+  //       sql += "\nwhere " + foundPrimaryKeyName + "=?" ;
+  //       hostVars.push ( foundPrimaryKeyValue ) ;
+  //     }
+  //     let xx = db.update ( sql, hostVars ) ;
+  //   }
+  //   db.commit() ;
+  //   db.disconnect() ;
+  // }) ;
+}

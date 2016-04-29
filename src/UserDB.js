@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+"use strict"
 
 var gepard = require ( "gepard" ) ;
 var wait = require ( "wait.for" ) ;
@@ -51,7 +52,7 @@ var S_RIGHTS = 'SELECT '
              + '  WHERE identity_key=?'
              ;
 
-UserDB = function ( url )
+var UserDB = function ( url )
 {
   this.db = new Database ( url ) ;
 };
@@ -221,6 +222,14 @@ UserDB.prototype.collectRights = function ( userIn
         {
           userIn.rights[row.right_name] = row.right_value ;
         }
+        else
+        {
+          let v = userIn.rights[row.right_name] ;
+          if ( v.indexOf ( row.right_value ) < 0 )
+          {
+            userIn.rights[row.right_name] = v + "," + row.right_value ;
+          }
+        }
         var groupName   = identityKeyToGroup[""+identityKeyList[j]] ;
         var groupRights = userIn.groups.rights[groupName] ;
         if ( ! groupRights )
@@ -249,13 +258,6 @@ UserDB.prototype.verifyUser = function ( userIn, callback )
     {
       return ;
     }
-    // if ( verifyForLogin )
-    // {
-    //   if ( ! user.LOGIN_ENABLED )
-    //   {
-    //     throw new Error ( "Invalid user." ) ;
-    //   }
-    // }
   } ) ;
 };
 module.exports = UserDB ;
@@ -265,11 +267,13 @@ if ( require.main === module )
   var verifyForLogin = true ;
 
   var userIn = {} ;
-  userIn["id"] = gepard.getProperty ( "user.id", "Miller" ) ;
+  // userIn["id"] = gepard.getProperty ( "user.id", "Miller" ) ;
+  userIn["id"] = gepard.getProperty ( "user.id", "dk" ) ;
   userIn["context"] = "WEB" ;
   userIn["_pwd"] = "654321" ;
 
-  var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/sidds" ) ;
+  // var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/sidds" ) ;
+  var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/inventum" ) ;
   // var url = gepard.getProperty ( "dburl", "sqlite://../test/sidds.db" ) ;
   var udb = new UserDB ( url ) ;
   console.log ( "udb=" + udb.db ) ;
