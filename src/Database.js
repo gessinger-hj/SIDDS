@@ -661,9 +661,13 @@ Database.prototype.executeRequest = function ( request, callback )
     sql += " from " + select_table ;
     if ( request.where )
     {
-      sql += " " + where ;
+      sql += " where " + request.where ;
     }
     this.select ( sql, request.hostVars, ( err, res ) => {
+      if ( err )
+      {
+        console.log ( err ) ;
+      }
       callback ( new DbResult ( err, res ) ) ;
     });
   }
@@ -753,52 +757,49 @@ if ( require.main === module )
         , "inventory_key":true
         }
       , "select_table": "v_inventory"
-      , "update_table": "t_inventory"
-      , "delete_table": "t_inventory"
+      // , "update_table": "t_inventory"
+      // , "delete_table": "t_inventory"
       }
     }
   } ;
   db.setConfig ( conf ) ;
 
-  var request =
-  {
-    action: "select"
-  , table: "t_inventory"
-  , columns: [ "*" ]
-  };
-  let r = new DbRequest ( request ) ;
-  db.executeRequest ( r, ( result ) => {
-    console.log ( result.result ) ;
-    db.commit() ;
-    db.disconnect() ;
-  });
-
-  // var row =
-  // {
-  //   inventory_key: 4
-  // , inventory_name: 'Microsoft 13. Updated'
-  // , description: 'DDDxhaFUhXS /view__usp=sharing 35 bit'
-  // , staff_number: '01001'
-  // , person_first_name: 'Dietmar'
-  // , person_last_name: 'Kauer'
-  // , miscellaneous: 'first updated'
-  // , status: 'active'
-  // , created_at: "Sat Apr 16 2016 16:13:09 GMT+0200 (CEST)"
-  // , last_modified: "Fri Apr 22 2016 12:29:46 GMT+0200 (CEST)"
-  // , operator_modified: null
-  // };
   // var request =
   // {
-  //   action: "update"
+  //   action: "select"
   // , table: "t_inventory"
-  // , row: row
+  // , columns: [ "*" ]
   // };
   // let r = new DbRequest ( request ) ;
   // db.executeRequest ( r, ( result ) => {
-  //   console.log ( result ) ;
+  //   console.log ( result.result ) ;
   //   db.commit() ;
   //   db.disconnect() ;
   // });
+
+  var row =
+  {
+    inventory_key: 4
+  , inventory_name: 'Microsoft 15. Updated'
+  , description: 'DDDxhaFUhXS /view__usp=sharing 35 bit'
+  , miscellaneous: 'first updated'
+  , status: 'active'
+  , created_at: "Sat Apr 16 2016 16:13:09 GMT+0200 (CEST)"
+  , last_modified: "Fri Apr 22 2016 12:29:46 GMT+0200 (CEST)"
+  , operator_modified: null
+  };
+  var request =
+  {
+    action: "update"
+  , table: "t_inventory"
+  , row: row
+  };
+  let r = new DbRequest ( request ) ;
+  db.executeRequest ( r, ( result ) => {
+    console.log ( result ) ;
+    db.commit() ;
+    db.disconnect() ;
+  });
 
 
   // console.log ( new Date ( row.last_modified ) ) ;
