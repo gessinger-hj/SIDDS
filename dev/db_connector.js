@@ -6,7 +6,6 @@ var tango = require ( 'tango' ) ;
 
 var sidds = require ( 'sidds' ) ;
 var Database = sidds.Database ;
-var wait = require ( "wait.for" ) ;
 
 var Log = gepard.LogFile ;
 var Xml = tango.Xml.Xml ;

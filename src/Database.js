@@ -627,76 +627,112 @@ Database.prototype.setConfig = function ( config )
 };
 Database.prototype.executeRequest = function ( request, callback )
 {
-  if ( request.action === 'select' )
+  if ( !request.operationList.length )
   {
-    if ( ! request.table )
+    throw new Error ( "Missing operations in request" ) ;
+  }
+  if ( request.operationList.length > 1 )
+  {
+    let result = null ;
+    wait.launchFiber ( () => {
+      for ( let i = 0 ; i < request.operationList.length ; i++ )
+      {
+        let operation = request.operationList[i] ;
+
+        var response = wait.forMethod ( this, "executeOperation", operation ) ;
+        if ( ! result )
+        {
+          result = new DbResult() ;
+        }
+        if ( response.err )
+        {
+          result.error = response.err ;
+          callback ( result ) ;
+          return ;
+        }
+        result.add ( operation.table, response.res ) ;
+      }
+      callback ( result ) ;
+    });
+    return ;
+  }
+  let operation = request.operationList[0] ;
+  this.executeOperation ( operation, ( err, res ) => {
+    callback ( new DbResult ( err, operation.table, res ) ) ;
+  });
+};
+Database.prototype.executeOperation = function ( operation, callback )
+{
+  if ( operation.name === 'select' )
+  {
+    if ( ! operation.table )
     {
-      callback ( new DbResult ( new Error ( "Missing table for action=" + request.action ) ) ) ;
+      callback ( null, { err:new Error ( "Missing table for operation=" + operation.name ) } ) ;
       return ;
     }
-    if ( ! Array.isArray ( request.columns ) )
+    if ( ! Array.isArray ( operation.columns ) )
     {
-      callback ( new DbResult ( new Error ( "Missing columns[] for action=" + request.action + " for table=" + request.table ) ) ) ;
+      callback ( null, { err:new Error ( "Missing columns[] for operation=" + operation.name + " for table=" + operation.table ) } )  ;
       return ;
     }
-    let operation = this.config.operations[request.table] ;
-    if ( ! operation )
+    let definedOperation = this.config.operations[operation.table] ;
+    if ( ! definedOperation )
     {
-      callback ( new DbResult ( new Error ( "No operation for action=" + request.action + " for table=" + request.table ) ) ) ;
+      callback ( null, { err:new Error ( "No defined-operation for " + operation.name + " for table=" + operation.table ) } ) ;
       return ;
     }
-    let select_table = request.table ;
-    if ( operation.select_table )
+    let select_table = operation.table ;
+    if ( definedOperation.select_table )
     {
-      select_table = operation.select_table ;
+      select_table = definedOperation.select_table ;
     }
     let first = true ;
     let sql = "select " ;
-    for ( let i = 0 ; i < request.columns.length ; i++ )
+    for ( let i = 0 ; i < operation.columns.length ; i++ )
     {
       if ( first ) first = false ;
       else sql += "\n, " ;
-      sql += request.columns[i] ;
+      sql += operation.columns[i] ;
     }
     sql += " from " + select_table ;
-    if ( request.where )
+    if ( operation.where )
     {
-      sql += " where " + request.where ;
+      sql += " where " + operation.where ;
     }
-    this.select ( sql, request.hostVars, ( err, res ) => {
+    this.select ( sql, operation.hostVars, ( err, res ) => {
       if ( err )
       {
         console.log ( err ) ;
       }
-      callback ( new DbResult ( err, res ) ) ;
+      callback ( null, { err:err, res:res } ) ;
     });
   }
   else
-  if ( request.action === 'update' )
+  if ( operation.name === 'update' )
   {
-    if ( ! request.table )
+    if ( ! operation.table )
     {
-      callback ( new DbResult ( new Error ( "Missing table for action=" + request.action ) ) ) ;
+      callback ( null, { err:new Error ( "Missing table for operation=" + operation.name ) } ) ;
       return ;
     }
-    let operation = this.config.operations[request.table] ;
-    if ( ! operation )
+    let definedOperation = this.config.operations[operation.table] ;
+    if ( ! definedOperation )
     {
-      callback ( new DbResult ( new Error ( "No operation for action=" + request.action + " for table=" + request.table ) ) ) ;
+      callback ( null, { err:new Error ( "No defined-operation for " + operation.name + " for table=" + operation.table ) } ) ;
       return ;
     }
-    this.getColumnsForTable ( request.table, ( err, columns ) => {
+    this.getColumnsForTable ( operation.table, ( err, columns ) => {
       if ( err )
       {
-        callback ( new DbResult ( err ) ) ;
+        callback ( null, { err: err } ) ;
         return ;
       }
-      let sql = "update " + request.table + " set " ;
+      let sql = "update " + operation.table + " set " ;
       let foundPrimaryKeyName = null ;
       let foundPrimaryKeyValue = null ;
       let hostVars = [] ;
       let first = true ;
-      for ( let key in request.row )
+      for ( let key in operation.row )
       {
         let c = columns[key] ;
         if ( ! c )
@@ -707,36 +743,43 @@ Database.prototype.executeRequest = function ( request, callback )
         if ( c.isPrimaryKey )
         {
           foundPrimaryKeyName = key ;
-          foundPrimaryKeyValue = request.row[key] ;
+          foundPrimaryKeyValue = operation.row[key] ;
           continue ;
         }
-        if ( operation.immutableColumns[key] )
+        if ( definedOperation.immutableColumns[key] )
         {
           continue ;
         }
         if ( first ) first = false ;
         else sql += "\n, " ;
         sql += key + "=?" ;
-        hostVars.push ( request.row[key] ) ;
+        hostVars.push ( operation.row[key] ) ;
       }
+      let where = "" ;
       if ( foundPrimaryKeyName )
       {
-        sql += "\nwhere " + foundPrimaryKeyName + "=?" ;
         hostVars.push ( foundPrimaryKeyValue ) ;
+        where = "\nwhere " + foundPrimaryKeyName + "=?" ;
       }
+      if ( operation.where )
+      {
+        if ( ! where ) where = "\nwhere " ;
+        else           where += ", " ;
+        where += " " + operation.where ;
+      }
+      sql += where ;
       db.update ( sql, hostVars, ( err, rows ) => {
         if ( err )
         {
-          callback ( new DbResult ( err ) ) ;
-          return ;
+          console.log ( err ) ;
         }
-        callback ( new DbResult ( err, rows ) ) ;
+        callback ( null, { err:err, res:rows } ) ;
       } ) ;
     });
   }
   else
   {
-    callback ( new Error ( "Invalid action=" + request.action ) ) ;
+    callback ( nukk, { err:new Error ( "Invalid operation=" + operation.name ) } ) ;
   }
 };
 module.exports = Database ;
@@ -766,13 +809,29 @@ if ( require.main === module )
 
   // var request =
   // {
-  //   action: "select"
+  //   attributes:null
+  // , operationList:
+  //   [
+  //     {
+  //       name: "select"
+  //     , table: "t_inventory"
+  //     , columns: [ "*" ]
+  //     , where: "inventory_key=?"
+  //     , hostVars: [ 1 ]
+  //     }
+  //   ]
+  // };
+  // let operation2 =
+  // {
+  //   name: "select"
   // , table: "t_inventory"
   // , columns: [ "*" ]
+  // , where: "inventory_key=2"
   // };
   // let r = new DbRequest ( request ) ;
-  // db.executeRequest ( r, ( result ) => {
-  //   console.log ( result.result ) ;
+  // r.operationList.push ( operation2 )
+  // db.executeRequest ( r, ( dbResult ) => {
+  //   gepard.log ( dbResult ) ;
   //   db.commit() ;
   //   db.disconnect() ;
   // });
@@ -780,23 +839,45 @@ if ( require.main === module )
   var row =
   {
     inventory_key: 4
-  , inventory_name: 'Microsoft 15. Updated'
+  , inventory_name: 'Microsoft 17. Updated'
   , description: 'DDDxhaFUhXS /view__usp=sharing 35 bit'
   , miscellaneous: 'first updated'
   , status: 'active'
   , created_at: "Sat Apr 16 2016 16:13:09 GMT+0200 (CEST)"
   , last_modified: "Fri Apr 22 2016 12:29:46 GMT+0200 (CEST)"
   , operator_modified: null
+  , person_last_name: 'Gessinger'
   };
   var request =
   {
-    action: "update"
-  , table: "t_inventory"
-  , row: row
+    attributes:null
+  , operationList:
+    [
+      {
+        name: "update"
+      , table: "t_inventory"
+      , row: row
+      }
+    , {
+        name: "select"
+      , table: "t_inventory"
+      , columns: [ "*" ]
+      , where: "inventory_key=4"
+      }
+    ]
   };
   let r = new DbRequest ( request ) ;
-  db.executeRequest ( r, ( result ) => {
-    console.log ( result ) ;
+  let r2 = new DbRequest() ;
+  // r2.addOperation(
+  // {
+  //   name: "update"
+  // , table: "t_inventory"
+  // , row: row
+  // });
+  r2.addUpdate ( "t_inventory", row ) ;
+  r2.addSelect ( "t_inventory", "inventory_key=4" );
+  db.executeRequest ( r2, ( result ) => {
+    gepard.log ( result ) ;
     db.commit() ;
     db.disconnect() ;
   });
@@ -807,7 +888,7 @@ if ( require.main === module )
   var thiz = this ;
   // wait.launchFiber ( () => {
   //   var columns = db.getColumnsForTable ( request.table ) ;
-  //   if ( request.action === "update" )
+  //   if ( request.operation === "update" )
   //   {
   //     let sql = "update " + request.table + " set " ;
   //     let foundPrimaryKeyName = null ;

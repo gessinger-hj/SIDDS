@@ -246,6 +246,12 @@ UserDB.prototype.collectRights = function ( userIn
     console.log ( exc ) ;
   }
 };
+/**
+ * Verify the given user
+ *
+ * @param      {<type>}    userIn    The user in
+ * @param      {Function}  callback  The callback
+ */
 UserDB.prototype.verifyUser = function ( userIn, callback )
 {
   var thiz = this ;
