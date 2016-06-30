@@ -657,8 +657,8 @@ Database.prototype.executeRequest = function ( request, callback )
     return ;
   }
   let operation = request.operationList[0] ;
-  this.executeOperation ( operation, ( err, res ) => {
-    callback ( new DbResult ( err, operation.table, res ) ) ;
+  this.executeOperation ( operation, ( err, result ) => {
+    callback ( new DbResult ( result.err, operation.table, result.res ) ) ;
   });
 };
 Database.prototype.executeOperation = function ( operation, callback )
@@ -672,8 +672,9 @@ Database.prototype.executeOperation = function ( operation, callback )
     }
     if ( ! Array.isArray ( operation.columns ) )
     {
-      callback ( null, { err:new Error ( "Missing columns[] for operation=" + operation.name + " for table=" + operation.table ) } )  ;
-      return ;
+      // callback ( null, { err:new Error ( "Missing columns[] for operation=" + operation.name + " for table=" + operation.table ) } )  ;
+      // return ;
+      operation.columns = [ '*' ] ;
     }
     let definedOperation = this.config.operations[operation.table] ;
     if ( ! definedOperation )
