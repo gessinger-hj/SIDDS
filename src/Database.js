@@ -569,6 +569,7 @@ Database.prototype.getColumnsForTable = function ( tableName, callback )
   if ( this.table2Columns )
   {
     callback ( null, this.table2Columns ) ;
+    return ;
   }
   if ( this._MYSQL )
   {
@@ -625,6 +626,31 @@ Database.prototype.setConfig = function ( config )
 {
   this.config = config ;
 };
+/**
+ * executeRequest
+ *
+ * @param      {<type>}    request   The request
+ * @param      {Function}  callback  The callback
+ * 
+ * var request =
+ * {
+ *   attributes:null
+ * , operationList:
+ *   [
+ *     {
+ *       name: "update"
+ *     , table: "t_inventory"
+ *     , row: row
+ *     }
+ *   , {
+ *       name: "select"
+ *     , table: "t_inventory"
+ *     , columns: [ "*" ]
+ *     , where: "inventory_key=4"
+ *     }
+ *   ]
+ * };
+ */
 Database.prototype.executeRequest = function ( request, callback )
 {
   if ( !request.operationList.length )
@@ -664,6 +690,19 @@ Database.prototype.executeRequest = function ( request, callback )
     });
   }
 };
+/**
+ * executeOperatrion
+ *
+ * @param      {<type>}    operation  The operation
+ * @param      {Function}  callback   The callback
+ * var operation =
+ * {
+ *   name: "select"
+ * , table: "t_inventory"
+ * , columns: [ "*" ]
+ * , where: "inventory_key=4"
+ * }
+ */
 Database.prototype.executeOperation = function ( operation, callback )
 {
   if ( operation.name === 'select' )
@@ -706,6 +745,9 @@ Database.prototype.executeOperation = function ( operation, callback )
     this.select ( sql, operation.hostVars, ( err, res ) => {
       if ( err )
       {
+        console.log ( "-------------------------------- sql ---------------------------------" ) ;
+        console.log ( sql ) ;
+        console.log ( "-------------------------------- sql ---------------------------------" ) ;
         console.log ( err ) ;
       }
       callback ( null, { err:err, res:res } ) ;
@@ -779,10 +821,17 @@ Database.prototype.executeOperation = function ( operation, callback )
         }
       }
       sql += where ;
-      db.update ( sql, hostVars, ( err, rows ) => {
+      this.update ( sql, hostVars, ( err, rows ) => {
         if ( err )
         {
+          console.log ( "-------------------------------- sql ---------------------------------" ) ;
+          console.log ( sql ) ;
+          console.log ( "-------------------------------- sql ---------------------------------" ) ;
           console.log ( err ) ;
+        }
+        if ( !Array.isArray ( rows ) )
+        {
+          rows = [ rows ] ;
         }
         callback ( null, { err:err, res:rows } ) ;
       } ) ;
@@ -790,106 +839,10 @@ Database.prototype.executeOperation = function ( operation, callback )
   }
   else
   {
-    callback ( nukk, { err:new Error ( "Invalid operation=" + operation.name ) } ) ;
+    callback ( null, { err:new Error ( "Invalid operation=" + operation.name ) } ) ;
   }
 };
 module.exports = Database ;
 if ( require.main === module )
 {
-  var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/inventum" ) ;
-  // var url = gepard.getProperty ( "dburl", "sqlite://../test/sidds.db" ) ;
-  var db = new Database ( url ) ;
-  console.log ( "db=" + db ) ;
-
-  let conf = {
-    operations: {
-      "t_inventory": {
-        "immutableColumns":
-        { "operator_modified":true
-        , "created_at":true
-        , "last_modified":true
-        , "inventory_key":true
-        }
-      , "select_table": "v_inventory"
-      // , "update_table": "t_inventory"
-      // , "delete_table": "t_inventory"
-      }
-    }
-  } ;
-  db.setConfig ( conf ) ;
-
-  // var request =
-  // {
-  //   attributes:null
-  // , operationList:
-  //   [
-  //     {
-  //       name: "select"
-  //     , table: "t_inventory"
-  //     , columns: [ "*" ]
-  //     , where: "inventory_key=?"
-  //     , hostVars: [ 1 ]
-  //     }
-  //   ]
-  // };
-  // let operation2 =
-  // {
-  //   name: "select"
-  // , table: "t_inventory"
-  // , columns: [ "*" ]
-  // , where: "inventory_key=2"
-  // };
-  // let r = new DbRequest ( request ) ;
-  // r.operationList.push ( operation2 )
-  // db.executeRequest ( r, ( dbResult ) => {
-  //   gepard.log ( dbResult ) ;
-  //   db.commit() ;
-  //   db.disconnect() ;
-  // });
-
-  var row =
-  {
-    inventory_key: 4
-  , inventory_name: 'Microsoft 17. Updated'
-  , description: 'DDDxhaFUhXS /view__usp=sharing 35 bit'
-  , miscellaneous: 'first updated'
-  , status: 'active'
-  , created_at: "Sat Apr 16 2016 16:13:09 GMT+0200 (CEST)"
-  , last_modified: "Fri Apr 22 2016 12:29:46 GMT+0200 (CEST)"
-  , operator_modified: null
-  , person_last_name: 'Gessinger'
-  };
-  var request =
-  {
-    attributes:null
-  , operationList:
-    [
-      {
-        name: "update"
-      , table: "t_inventory"
-      , row: row
-      }
-    , {
-        name: "select"
-      , table: "t_inventory"
-      , columns: [ "*" ]
-      , where: "inventory_key=4"
-      }
-    ]
-  };
-  let r = new DbRequest ( request ) ;
-  let r2 = new DbRequest() ;
-  // r2.addOperation(
-  // {
-  //   name: "update"
-  // , table: "t_inventory"
-  // , row: row
-  // });
-  r2.addUpdate ( "t_inventory", row ) ;
-  r2.addSelect ( "t_inventory", "inventory_key=4" );
-  db.executeRequest ( r2, ( result ) => {
-    gepard.log ( result ) ;
-    db.commit() ;
-    db.disconnect() ;
-  });
 }

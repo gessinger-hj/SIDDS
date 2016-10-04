@@ -1,8 +1,8 @@
 /*
 * @Author: Hans Jürgen Gessinger
 * @Date:   2016-04-26 15:34:30
-* @Last Modified by:   gess
-* @Last Modified time: 2016-06-30 17:02:51
+* @Last Modified by:   Hans Jürgen Gessinger
+* @Last Modified time: 2016-07-15 17:12:55
 */
 
 'use strict';
@@ -28,25 +28,29 @@ DbRequest.prototype.addSelect = function ( table, where, columns )
 	if ( ! Array.isArray ( columns ) ) columns = [] ;
 	if ( ! columns.length ) columns.push ( '*' ) ;
 
-	let o =
+	this.operationList.push (
 	{ name: 'select'
 	, table:table
 	, columns: columns
 	, where:where
-	} ;
-	this.operationList.push ( o ) ;
-	return o ;
+	}) ;
 };
 DbRequest.prototype.addUpdate = function ( table, row, where )
 {
-	let o =
+	this.operationList.push (
 	{ name: 'update'
 	, table:table
 	, row: row
 	, where:where
-	} ;
-	this.operationList.push ( o )
-	return o ;
+	}) ;
+};
+DbRequest.prototype.addInsert = function ( table, row )
+{
+	this.operationList.push (
+	{ name: 'insert'
+	, table:table
+	, row: row
+	}) ;
 };
 module.exports = DbRequest ;
 
