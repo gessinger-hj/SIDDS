@@ -656,10 +656,13 @@ Database.prototype.executeRequest = function ( request, callback )
     });
     return ;
   }
-  let operation = request.operationList[0] ;
-  this.executeOperation ( operation, ( err, res ) => {
-    callback ( new DbResult ( err, operation.table, res ) ) ;
-  });
+  else
+  {
+    let operation = request.operationList[0] ;
+    this.executeOperation ( operation, ( err, result ) => {
+      callback ( new DbResult ( result.err, operation.table, result.res ) ) ;
+    });
+  }
 };
 Database.prototype.executeOperation = function ( operation, callback )
 {
@@ -672,8 +675,9 @@ Database.prototype.executeOperation = function ( operation, callback )
     }
     if ( ! Array.isArray ( operation.columns ) )
     {
-      callback ( null, { err:new Error ( "Missing columns[] for operation=" + operation.name + " for table=" + operation.table ) } )  ;
-      return ;
+      // callback ( null, { err:new Error ( "Missing columns[] for operation=" + operation.name + " for table=" + operation.table ) } )  ;
+      // return ;
+      operation.columns = [ '*' ] ;
     }
     let definedOperation = this.config.operations[operation.table] ;
     if ( ! definedOperation )
@@ -766,6 +770,13 @@ Database.prototype.executeOperation = function ( operation, callback )
         if ( ! where ) where = "\nwhere " ;
         else           where += ", " ;
         where += " " + operation.where ;
+      }
+      if ( operation.hostVars )
+      {
+        for ( let i = 0 ; i < operation.hostVars.length ; i++ )
+        {
+          hostVars.push ( operation.hostVars[i] ) ;
+        }
       }
       sql += where ;
       db.update ( sql, hostVars, ( err, rows ) => {
@@ -881,51 +892,4 @@ if ( require.main === module )
     db.commit() ;
     db.disconnect() ;
   });
-
-
-  // console.log ( new Date ( row.last_modified ) ) ;
-  // console.log ( request ) ;
-  var thiz = this ;
-  // wait.launchFiber ( () => {
-  //   var columns = db.getColumnsForTable ( request.table ) ;
-  //   if ( request.operation === "update" )
-  //   {
-  //     let sql = "update " + request.table + " set " ;
-  //     let foundPrimaryKeyName = null ;
-  //     let foundPrimaryKeyValue = null ;
-  //     let hostVars = [] ;
-  //     let first = true ;
-  //     for ( let key in row )
-  //     {
-  //       let c = columns[key] ;
-  //       if ( ! c )
-  //       {
-  //         console.log ( "No column:'" + key + "'" ) ;
-  //         continue ;
-  //       }
-  //       if ( c.isPrimaryKey )
-  //       {
-  //         foundPrimaryKeyName = key ;
-  //         foundPrimaryKeyValue = row[key] ;
-  //         continue ;
-  //       }
-  //       if ( immutableColumns[key] )
-  //       {
-  //         continue ;
-  //       }
-  //       if ( first ) first = false ;
-  //       else sql += "\n, " ;
-  //       sql += key + "=?" ;
-  //       hostVars.push ( row[key] ) ;
-  //     }
-  //     if ( foundPrimaryKeyName )
-  //     {
-  //       sql += "\nwhere " + foundPrimaryKeyName + "=?" ;
-  //       hostVars.push ( foundPrimaryKeyValue ) ;
-  //     }
-  //     let xx = db.update ( sql, hostVars ) ;
-  //   }
-  //   db.commit() ;
-  //   db.disconnect() ;
-  // }) ;
 }
