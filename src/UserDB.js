@@ -273,14 +273,11 @@ if ( require.main === module )
   var verifyForLogin = true ;
 
   var userIn = {} ;
-  // userIn["id"] = gepard.getProperty ( "user.id", "Miller" ) ;
-  userIn["id"] = gepard.getProperty ( "user.id", "dk" ) ;
+  userIn["id"] = gepard.getProperty ( "user.id", "admin" ) ;
   userIn["context"] = "WEB" ;
-  userIn["_pwd"] = "654321" ;
+  userIn["_pwd"] = gepard.getProperty ( "user.pwd", "654321" ) ;
 
-  // var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/sidds" ) ;
-  var url = gepard.getProperty ( "dburl", "mysql://root:luap1997@localhost/inventum" ) ;
-  // var url = gepard.getProperty ( "dburl", "sqlite://../test/sidds.db" ) ;
+  var url = gepard.getProperty ( "sidds.url" ) ;
   var udb = new UserDB ( url ) ;
   console.log ( "udb=" + udb.db ) ;
   wait.launchFiber ( udb._verifyUser.bind ( udb ), userIn, function ( err, user )
