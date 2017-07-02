@@ -248,7 +248,7 @@ UserDB.prototype.collectRights = function ( userIn
 };
 /**
  * Verify the given user
- *
+ *π
  * @param      {<type>}    userIn    The user in
  * @param      {Function}  callback  The callback
  */
